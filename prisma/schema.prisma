@@ -1,0 +1,136 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum StudentStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum RoundType {
+  ROUND_1_APTITUDE_VERBAL_WRITTEN
+  ROUND_2_CODING
+}
+
+enum QuestionCategory {
+  APTITUDE
+  VERBAL
+  WRITTEN_PROMPT
+  CODING
+  SQL
+  PYTHON
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  ROUND_1_IN_PROGRESS
+  ROUND_1_COMPLETED
+  ROUND_2_IN_PROGRESS
+  MALPRACTICE_LOCKED
+  COMPLETED
+  DISQUALIFIED
+}
+
+model User {
+  id              String             @id @default(uuid())
+  email           String             @unique
+  password        String
+  name            String
+  college         String?
+  department      String?
+  rollNumber      String?
+  position        String?
+  dob             String?
+  mobileNumber    String?
+  role            Role               @default(STUDENT)
+  status          StudentStatus      @default(PENDING_APPROVAL)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  attempts        AssessmentAttempt[]
+  malpracticeLogs MalpracticeLog[]
+}
+
+model Assessment {
+  id           String              @id @default(uuid())
+  title        String
+  description  String?
+  durationR1   Int                 @default(30) // in minutes
+  durationR2   Int                 @default(45) // in minutes
+  passingScore Int?                @default(60)
+  isActive     Boolean             @default(true)
+  questions    Question[]
+  attempts     AssessmentAttempt[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model Question {
+  id            String           @id @default(uuid())
+  assessmentId  String
+  assessment    Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  round         RoundType
+  category      QuestionCategory
+  targetRole    String?          @default("ALL") // "ALL", "Software Developer", "Data Analyst"
+  title         String
+  content       String           // Question description or prompt
+  options       Json?            // For MCQs: ["Option A", "Option B", ...]
+  correctAnswer String?          // For MCQs
+  points        Int              @default(1)
+  
+  // For coding questions:
+  starterCode   Json?            // { "javascript": "...", "python": "...", "sql": "..." }
+  testCases     Json?            // [{ "input": "...", "output": "...", "isHidden": false }]
+  
+  createdAt     DateTime         @default(now())
+}
+
+model AssessmentAttempt {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId    String
+  assessment      Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  status          AttemptStatus    @default(NOT_STARTED)
+  currentRound    RoundType?
+  
+  tabSwitchCount  Int              @default(0)
+  round1Score     Float?
+  round2Score     Float?
+  writtenEssay    String?
+  answers         Json?            // Submitted MCQ & Code answers
+  
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  
+  malpracticeLogs MalpracticeLog[]
+}
+
+model MalpracticeLog {
+  id             String            @id @default(uuid())
+  attemptId      String
+  attempt        AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  violationType  String            // "TAB_SWITCH", "FULLSCREEN_EXIT"
+  violationCount Int
+  adminDecision  String?           // "PENDING", "GIVEN_CHANCE", "REJECTED"
+  adminRemarks   String?
+  timestamp      DateTime          @default(now())
+}

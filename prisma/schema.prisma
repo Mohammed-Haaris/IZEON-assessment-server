@@ -57,7 +57,7 @@ model User {
   dob             String?
   mobileNumber    String?
   role            Role               @default(STUDENT)
-  status          StudentStatus      @default(PENDING_APPROVAL)
+  status          StudentStatus      @default(APPROVED)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   attempts        AssessmentAttempt[]

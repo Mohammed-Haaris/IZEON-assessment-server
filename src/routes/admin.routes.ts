@@ -256,6 +256,220 @@ router.get("/malpractice-logs", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// 9.1. Admin Give Another Chance to Candidate
+router.post("/attempts/:id/give-chance", async (req: AuthRequest, res: Response) => {
+  try {
+    const attemptId = req.params.id as string;
+    const { remarks } = req.body;
+
+    const attempt = await prisma.assessmentAttempt.findUnique({
+      where: { id: attemptId },
+      include: { user: true },
+    });
+
+    if (!attempt) {
+      res.status(404).json({ message: "Attempt not found" });
+      return;
+    }
+
+    await prisma.assessmentAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: "ROUND_2_IN_PROGRESS",
+        tabSwitchCount: 1, // Grace period strike
+      },
+    });
+
+    await prisma.malpracticeLog.updateMany({
+      where: {
+        attemptId,
+        OR: [{ adminDecision: "PENDING" }, { adminDecision: null }, { adminDecision: "" }],
+      },
+      data: {
+        adminDecision: "GIVEN_CHANCE",
+        adminRemarks: remarks || "Admin granted candidate another chance.",
+      },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      const unlockPayload = {
+        attemptId,
+        message: "The administrator has granted you another chance. Your test has been unlocked.",
+      };
+      io.to(`attempt:${attemptId}`).emit("proctor:unlocked", unlockPayload);
+      io.emit("proctor:unlocked", unlockPayload);
+      io.to("admin_monitor").emit("admin:action_resolved", {
+        attemptId,
+        decision: "GIVEN_CHANCE",
+      });
+      io.emit("admin:action_resolved", {
+        attemptId,
+        decision: "GIVEN_CHANCE",
+      });
+    }
+
+    res.json({ message: `Successfully gave another chance to ${attempt.user.name}. Exam screen is now unlocked.` });
+  } catch (error: any) {
+    console.error("Give chance error:", error);
+    res.status(500).json({ message: "Failed to give chance", error: error.message });
+  }
+});
+
+// 9.2. Admin Reject / Disqualify Candidate
+router.post("/attempts/:id/reject", async (req: AuthRequest, res: Response) => {
+  try {
+    const attemptId = req.params.id as string;
+    const { remarks } = req.body;
+
+    const attempt = await prisma.assessmentAttempt.findUnique({
+      where: { id: attemptId },
+      include: { user: true },
+    });
+
+    if (!attempt) {
+      res.status(404).json({ message: "Attempt not found" });
+      return;
+    }
+
+    await prisma.assessmentAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: "DISQUALIFIED",
+        completedAt: new Date(),
+      },
+    });
+
+    await prisma.malpracticeLog.updateMany({
+      where: {
+        attemptId,
+        OR: [{ adminDecision: "PENDING" }, { adminDecision: null }, { adminDecision: "" }],
+      },
+      data: {
+        adminDecision: "REJECTED",
+        adminRemarks: remarks || "Disqualified for multiple violations.",
+      },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      const disqPayload = {
+        attemptId,
+        message: "Your assessment has been disqualified by the administrator due to malpractice violations.",
+      };
+      io.to(`attempt:${attemptId}`).emit("proctor:disqualified", disqPayload);
+      io.emit("proctor:disqualified", disqPayload);
+      io.to("admin_monitor").emit("admin:action_resolved", {
+        attemptId,
+        decision: "REJECTED",
+      });
+      io.emit("admin:action_resolved", {
+        attemptId,
+        decision: "REJECTED",
+      });
+    }
+
+    res.json({ message: `Successfully disqualified candidate ${attempt.user.name}.` });
+  } catch (error: any) {
+    console.error("Reject candidate error:", error);
+    res.status(500).json({ message: "Failed to reject candidate", error: error.message });
+  }
+});
+
+// 9.3. Resolve Specific Malpractice Incident Log Directly
+router.post("/malpractice-logs/:logId/decision", async (req: AuthRequest, res: Response) => {
+  try {
+    const logId = req.params.logId as string;
+    const { decision, remarks } = req.body; // decision: "GIVEN_CHANCE" | "REJECTED"
+
+    const log = await prisma.malpracticeLog.findUnique({
+      where: { id: logId },
+      include: { attempt: true, user: true },
+    });
+
+    if (!log) {
+      res.status(404).json({ message: "Incident log not found" });
+      return;
+    }
+
+    // 1. Update this specific log
+    await prisma.malpracticeLog.update({
+      where: { id: logId },
+      data: {
+        adminDecision: decision,
+        adminRemarks: remarks || (decision === "GIVEN_CHANCE" ? "Admin granted candidate another chance." : "Candidate disqualified by admin."),
+      },
+    });
+
+    // 2. Also update any other pending logs for the same attempt
+    if (log.attemptId) {
+      await prisma.malpracticeLog.updateMany({
+        where: {
+          attemptId: log.attemptId,
+          OR: [{ adminDecision: "PENDING" }, { adminDecision: null }, { adminDecision: "" }],
+        },
+        data: {
+          adminDecision: decision,
+          adminRemarks: remarks || (decision === "GIVEN_CHANCE" ? "Admin granted candidate another chance." : "Candidate disqualified by admin."),
+        },
+      });
+
+      // 3. Update the corresponding attempt
+      if (decision === "GIVEN_CHANCE") {
+        await prisma.assessmentAttempt.update({
+          where: { id: log.attemptId },
+          data: {
+            status: "ROUND_2_IN_PROGRESS",
+            tabSwitchCount: 1,
+          },
+        });
+      } else if (decision === "REJECTED") {
+        await prisma.assessmentAttempt.update({
+          where: { id: log.attemptId },
+          data: {
+            status: "DISQUALIFIED",
+            completedAt: new Date(),
+          },
+        });
+      }
+
+      // 4. Broadcast real-time events
+      const io = req.app.get("io");
+      if (io) {
+        if (decision === "GIVEN_CHANCE") {
+          const unlockPayload = {
+            attemptId: log.attemptId,
+            message: "The administrator has granted you another chance. Your test has been unlocked.",
+          };
+          io.to(`attempt:${log.attemptId}`).emit("proctor:unlocked", unlockPayload);
+          io.emit("proctor:unlocked", unlockPayload);
+        } else {
+          const disqPayload = {
+            attemptId: log.attemptId,
+            message: "Your assessment has been disqualified by the administrator due to malpractice violations.",
+          };
+          io.to(`attempt:${log.attemptId}`).emit("proctor:disqualified", disqPayload);
+          io.emit("proctor:disqualified", disqPayload);
+        }
+
+        io.to("admin_monitor").emit("admin:action_resolved", {
+          attemptId: log.attemptId,
+          decision,
+        });
+        io.emit("admin:action_resolved", {
+          attemptId: log.attemptId,
+          decision,
+        });
+      }
+    }
+
+    res.json({ message: `Successfully resolved incident for ${log.user.name} as ${decision}.` });
+  } catch (error: any) {
+    console.error("Resolve log error:", error);
+    res.status(500).json({ message: "Failed to resolve malpractice log", error: error.message });
+  }
+});
+
 // 10. Delete a user (student/candidate) completely from the database
 router.delete("/users/:id", async (req: AuthRequest, res: Response) => {
   try {
@@ -357,6 +571,112 @@ router.get("/admins", async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Get admins error:", error);
     res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
+// 13. Export all students and their assessment details as CSV (Excel compatible)
+router.get("/export-students", async (req: AuthRequest, res: Response) => {
+  try {
+    const students = await prisma.user.findMany({
+      where: { role: "STUDENT" },
+      include: {
+        attempts: {
+          include: {
+            assessment: { select: { title: true, passingScore: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const s = String(val);
+      if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return `"${s}"`;
+    };
+
+    const headers = [
+      "S.No",
+      "Candidate Name",
+      "Email Address",
+      "Contact Number",
+      "Roll Number",
+      "College / Institution",
+      "Department",
+      "Applied Position / Track",
+      "Date of Birth",
+      "Account Status",
+      "Registration Date",
+      "Assessment Title",
+      "Exam Status",
+      "Round 1 Score (pts)",
+      "Round 2 Score (pts)",
+      "Total Marks (pts)",
+      "Passing Criteria",
+      "Final Result",
+      "Proctoring Tab Switches",
+      "Exam Started At",
+      "Exam Completed At",
+    ];
+
+    const rows = students.map((s, idx) => {
+      const att = s.attempts[0];
+      const r1 = att?.round1Score ?? null;
+      const r2 = att?.round2Score ?? null;
+      const total = r1 !== null || r2 !== null ? (r1 ?? 0) + (r2 ?? 0) : null;
+      const passingScore = att?.assessment?.passingScore ?? 60;
+
+      let finalResult = "NOT STARTED";
+      if (att) {
+        if (att.status === "COMPLETED") {
+          finalResult = (total ?? 0) >= passingScore ? "QUALIFIED" : "NOT QUALIFIED";
+        } else if (att.status === "DISQUALIFIED") {
+          finalResult = "DISQUALIFIED";
+        } else if (att.status === "MALPRACTICE_LOCKED") {
+          finalResult = "SUSPENDED (LOCKED)";
+        } else {
+          finalResult = "IN PROGRESS";
+        }
+      }
+
+      return [
+        escapeCSV(idx + 1),
+        escapeCSV(s.name),
+        escapeCSV(s.email),
+        escapeCSV(s.mobileNumber || "N/A"),
+        escapeCSV(s.rollNumber || "N/A"),
+        escapeCSV(s.college || "N/A"),
+        escapeCSV(s.department || "N/A"),
+        escapeCSV(s.position || "Software Developer"),
+        escapeCSV(s.dob || "N/A"),
+        escapeCSV(s.status),
+        escapeCSV(s.createdAt ? s.createdAt.toLocaleString() : "N/A"),
+        escapeCSV(att?.assessment?.title || "N/A"),
+        escapeCSV(att ? att.status.replace(/_/g, " ") : "NOT STARTED"),
+        escapeCSV(r1 !== null ? r1 : "—"),
+        escapeCSV(r2 !== null ? r2 : "—"),
+        escapeCSV(total !== null ? total : "—"),
+        escapeCSV(`${passingScore} pts`),
+        escapeCSV(finalResult),
+        escapeCSV(att ? `${att.tabSwitchCount || 0} switches` : "0 switches"),
+        escapeCSV(att?.startedAt ? att.startedAt.toLocaleString() : "—"),
+        escapeCSV(att?.completedAt ? att.completedAt.toLocaleString() : "—"),
+      ].join(",");
+    });
+
+    const csvData = "\uFEFF" + [headers.map(escapeCSV).join(","), ...rows].join("\r\n");
+    const dateStr = new Date().toISOString().split("T")[0];
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=IZEON_Students_Export_${dateStr}.csv`);
+    res.status(200).send(csvData);
+  } catch (error: any) {
+    console.error("Export students error:", error);
+    res.status(500).json({ message: "Failed to export student records", error: error.message });
   }
 });
 

@@ -82,12 +82,9 @@ export const requireApprovedStudent = (
     return;
   }
 
-  if (req.user.status !== "APPROVED") {
+  if (req.user.status === "REJECTED") {
     res.status(403).json({
-      message:
-        req.user.status === "PENDING_APPROVAL"
-          ? "Your account is pending admin approval."
-          : "Your account has been rejected by the administrator.",
+      message: "Your account has been rejected by the administrator.",
       status: req.user.status,
     });
     return;

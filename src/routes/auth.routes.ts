@@ -34,9 +34,9 @@ router.post("/register", async (req, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    // Public registrations are strictly for STUDENTs awaiting approval
+    // Public registrations are for STUDENTs with direct assessment access
     const assignedRole = "STUDENT";
-    const assignedStatus = "PENDING_APPROVAL";
+    const assignedStatus = "APPROVED";
 
     const user = await prisma.user.create({
       data: {
@@ -75,7 +75,7 @@ router.post("/register", async (req, res: Response) => {
     res.status(201).json({
       message:
         user.role === "STUDENT"
-          ? "Account registered successfully! Awaiting admin approval to start assessments."
+          ? "Account registered successfully! You can start your assessment immediately."
           : "Admin account registered successfully!",
       user,
       token,
@@ -114,6 +114,15 @@ router.post("/login", async (req, res: Response) => {
         status: user.status,
       });
       return;
+    }
+
+    // Auto-activate any student account that was previously PENDING_APPROVAL
+    if (user.role === "STUDENT" && user.status === "PENDING_APPROVAL") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: "APPROVED" },
+      });
+      user.status = "APPROVED";
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
@@ -162,6 +171,15 @@ router.get("/me", authenticateToken, async (req: AuthRequest, res: Response) => 
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
+    }
+
+    // Auto-activate if previously pending
+    if (user.role === "STUDENT" && user.status === "PENDING_APPROVAL") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: "APPROVED" },
+      });
+      user.status = "APPROVED";
     }
 
     res.json({ user });

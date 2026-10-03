@@ -22,6 +22,11 @@ export function setupProctorSocket(io: SocketIOServer) {
           const { attemptId, violationType = "TAB_SWITCH" } = data;
           if (!attemptId) return;
 
+          // Ignore WINDOW_BLUR to prevent false strikes on accidental clicks/editor focuses
+          if (violationType === "WINDOW_BLUR") {
+            return;
+          }
+
           const attempt = await prisma.assessmentAttempt.findUnique({
             where: { id: attemptId },
             include: { user: true, assessment: true },
@@ -57,7 +62,7 @@ export function setupProctorSocket(io: SocketIOServer) {
             });
           } else {
             // Strike 2+: Lock attempt and notify Admin
-            const updated = await prisma.assessmentAttempt.update({
+            await prisma.assessmentAttempt.update({
               where: { id: attemptId },
               data: {
                 tabSwitchCount: newCount,
@@ -72,8 +77,7 @@ export function setupProctorSocket(io: SocketIOServer) {
                 "Assessment locked due to multiple malpractice violations. Administrator has been notified to review your session.",
             });
 
-            // Trigger instant real-time pop-up alert to Admin Dashboard
-            io.to("admin_monitor").emit("admin:malpractice_alert", {
+            const alertPayload = {
               attemptId: attempt.id,
               logId: log.id,
               studentId: attempt.user.id,
@@ -83,7 +87,11 @@ export function setupProctorSocket(io: SocketIOServer) {
               violationType,
               violationCount: newCount,
               timestamp: new Date(),
-            });
+            };
+
+            // Trigger instant real-time alert to Admin Dashboard
+            io.to("admin_monitor").emit("admin:malpractice_alert", alertPayload);
+            io.emit("admin:malpractice_alert", alertPayload);
           }
         } catch (error) {
           console.error("Error processing tab switch:", error);
@@ -110,7 +118,10 @@ export function setupProctorSocket(io: SocketIOServer) {
 
           // Update pending logs
           await prisma.malpracticeLog.updateMany({
-            where: { attemptId, adminDecision: "PENDING" },
+            where: {
+              attemptId,
+              OR: [{ adminDecision: "PENDING" }, { adminDecision: null }, { adminDecision: "" }],
+            },
             data: {
               adminDecision: "GIVEN_CHANCE",
               adminRemarks: remarks || "Admin granted candidate another chance.",
@@ -118,13 +129,20 @@ export function setupProctorSocket(io: SocketIOServer) {
           });
 
           // Unblock student screen
-          io.to(`attempt:${attemptId}`).emit("proctor:unlocked", {
+          const unlockData = {
+            attemptId,
             message:
               "The administrator has granted you another chance. Please return to fullscreen and do not leave the exam tab.",
-          });
+          };
+          io.to(`attempt:${attemptId}`).emit("proctor:unlocked", unlockData);
+          io.emit("proctor:unlocked", unlockData);
 
           // Notify admins that incident was resolved
           io.to("admin_monitor").emit("admin:action_resolved", {
+            attemptId,
+            decision: "GIVEN_CHANCE",
+          });
+          io.emit("admin:action_resolved", {
             attemptId,
             decision: "GIVEN_CHANCE",
           });
@@ -151,7 +169,10 @@ export function setupProctorSocket(io: SocketIOServer) {
           });
 
           await prisma.malpracticeLog.updateMany({
-            where: { attemptId, adminDecision: "PENDING" },
+            where: {
+              attemptId,
+              OR: [{ adminDecision: "PENDING" }, { adminDecision: null }, { adminDecision: "" }],
+            },
             data: {
               adminDecision: "REJECTED",
               adminRemarks: remarks || "Disqualified for multiple violations.",
@@ -159,13 +180,20 @@ export function setupProctorSocket(io: SocketIOServer) {
           });
 
           // Disqualify student screen
-          io.to(`attempt:${attemptId}`).emit("proctor:disqualified", {
+          const disqData = {
+            attemptId,
             message:
               "Your assessment has been disqualified by the administrator due to malpractice violations.",
-          });
+          };
+          io.to(`attempt:${attemptId}`).emit("proctor:disqualified", disqData);
+          io.emit("proctor:disqualified", disqData);
 
           // Notify admins
           io.to("admin_monitor").emit("admin:action_resolved", {
+            attemptId,
+            decision: "REJECTED",
+          });
+          io.emit("admin:action_resolved", {
             attemptId,
             decision: "REJECTED",
           });

@@ -47,10 +47,11 @@ const io = new SocketIOServer(server, {
 });
 
 // Initialize proctoring sockets
+app.set("io", io);
 setupProctorSocket(io);
 
 // Start server and seed default data
 server.listen(PORT, async () => {
-  console.log(`🚀 IZEON Assessment Server running on http://localhost:${PORT}`);
+  console.log(`IZEON Assessment Server running on http://localhost:${PORT}`);
   await seedDefaultData();
 });

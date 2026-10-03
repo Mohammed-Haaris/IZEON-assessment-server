@@ -21,6 +21,12 @@ export async function seedDefaultData() {
       console.log("✅ Default Admin created: admin@izeon.com / admin123");
     }
 
+    // Auto-activate any legacy pending students so they have immediate assessment access
+    await prisma.user.updateMany({
+      where: { role: "STUDENT", status: "PENDING_APPROVAL" },
+      data: { status: "APPROVED" },
+    });
+
     // 2. Ensure Sample Assessment exists
     const assessmentCount = await prisma.assessment.count();
     if (assessmentCount === 0) {

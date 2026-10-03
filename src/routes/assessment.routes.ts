@@ -54,14 +54,26 @@ router.get("/active", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Check if student already has an ongoing or finished attempt
-    const existingAttempt = await prisma.assessmentAttempt.findFirst({
+    // Check if student already has a finished or ongoing attempt
+    const finishedAttempt = await prisma.assessmentAttempt.findFirst({
       where: {
         userId: req.user!.id,
         assessmentId: assessment.id,
+        status: { in: ["COMPLETED", "DISQUALIFIED"] },
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const ongoingAttempt = await prisma.assessmentAttempt.findFirst({
+      where: {
+        userId: req.user!.id,
+        assessmentId: assessment.id,
+        status: { notIn: ["COMPLETED", "DISQUALIFIED"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const existingAttempt = finishedAttempt || ongoingAttempt;
 
     res.json({ assessment, existingAttempt });
   } catch (error: any) {
@@ -129,7 +141,26 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Check existing attempt
+    // 1. Strictly block retakes if student already COMPLETED or was DISQUALIFIED
+    const alreadyFinished = await prisma.assessmentAttempt.findFirst({
+      where: {
+        userId: req.user!.id,
+        assessmentId: assessment.id,
+        status: { in: ["COMPLETED", "DISQUALIFIED"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (alreadyFinished) {
+      res.status(403).json({
+        message: "You have already completed this assessment. Resuming or retaking is strictly not permitted.",
+        attempt: alreadyFinished,
+        alreadyFinished: true,
+      });
+      return;
+    }
+
+    // 2. Check existing in-progress attempt
     let attempt = await prisma.assessmentAttempt.findFirst({
       where: {
         userId: req.user!.id,
@@ -182,8 +213,8 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (attempt.status === "DISQUALIFIED") {
-      res.status(403).json({ message: "Attempt disqualified due to malpractice." });
+    if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
+      res.status(403).json({ message: "This assessment has already been completed. Further submissions are prohibited." });
       return;
     }
 
@@ -278,8 +309,8 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (attempt.status === "DISQUALIFIED") {
-      res.status(403).json({ message: "Attempt disqualified due to malpractice." });
+    if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
+      res.status(403).json({ message: "This assessment has already been finalized and submitted." });
       return;
     }
 

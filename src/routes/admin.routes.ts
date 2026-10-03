@@ -209,6 +209,9 @@ router.delete("/questions/:id", async (req: AuthRequest, res: Response) => {
 router.get("/attempts", async (req: AuthRequest, res: Response) => {
   try {
     const attempts = await prisma.assessmentAttempt.findMany({
+      where: {
+        user: { role: "STUDENT" },
+      },
       include: {
         user: {
           select: {
@@ -236,6 +239,19 @@ router.get("/attempts", async (req: AuthRequest, res: Response) => {
     res.json({ attempts });
   } catch (error: any) {
     res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
+// 8.1. Delete a specific assessment attempt
+router.delete("/attempts/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    await prisma.malpracticeLog.deleteMany({ where: { attemptId: id } });
+    await prisma.assessmentAttempt.delete({ where: { id } });
+    res.json({ message: "Assessment attempt deleted successfully." });
+  } catch (error: any) {
+    console.error("Delete attempt error:", error);
+    res.status(500).json({ message: "Failed to delete attempt", error: error.message });
   }
 });
 

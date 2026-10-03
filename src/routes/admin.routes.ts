@@ -38,7 +38,7 @@ router.get("/students", async (req: AuthRequest, res: Response) => {
         _count: {
           select: { attempts: true },
         },
-      },
+      } as any,
       orderBy: { createdAt: "desc" },
     });
 

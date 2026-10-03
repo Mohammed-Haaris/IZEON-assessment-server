@@ -15,15 +15,37 @@ router.use(requireApprovedStudent);
 router.get("/active", async (req: AuthRequest, res: Response) => {
   try {
     const studentRole = req.user?.position;
-    const roleWhere = studentRole
-      ? {
-          OR: [
-            { targetRole: "ALL" },
-            { targetRole: studentRole },
-            { targetRole: null },
-          ],
-        }
-      : {};
+    let roleWhere: any = {};
+    if (studentRole === "Software Developer") {
+      roleWhere = {
+        AND: [
+          {
+            OR: [
+              { targetRole: "ALL" },
+              { targetRole: "Software Developer" },
+              { targetRole: null },
+            ],
+          },
+          { category: { not: "SQL" } },
+        ],
+      };
+    } else if (studentRole === "Data Analyst") {
+      roleWhere = {
+        OR: [
+          { targetRole: "ALL" },
+          { targetRole: "Data Analyst" },
+          { targetRole: null },
+        ],
+      };
+    } else if (studentRole) {
+      roleWhere = {
+        OR: [
+          { targetRole: "ALL" },
+          { targetRole: studentRole },
+          { targetRole: null },
+        ],
+      };
+    }
 
     const assessment: any = await prisma.assessment.findFirst({
       where: { isActive: true },
@@ -270,7 +292,10 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
           return q.targetRole === "Data Analyst" || q.targetRole === "ALL" || !q.targetRole;
         }
         if (studentRole === "Software Developer") {
-          return q.targetRole === "Software Developer" || q.targetRole === "ALL" || !q.targetRole;
+          return (
+            (q.targetRole === "Software Developer" || q.targetRole === "ALL" || !q.targetRole) &&
+            q.category !== "SQL"
+          );
         }
         return true;
       })

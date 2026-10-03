@@ -181,8 +181,14 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
       });
     }
 
+    const isLocked = attempt.status === "MALPRACTICE_LOCKED" || attempt.tabSwitchCount >= 2;
+
     res.json({
       attempt,
+      isLocked,
+      lockMessage: isLocked
+        ? "Assessment locked due to multiple malpractice violations. Administrator has been notified to review your session."
+        : undefined,
       round1Questions: assessment.questions,
       durationR1: assessment.durationR1,
     });
@@ -215,6 +221,14 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
 
     if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
       res.status(403).json({ message: "This assessment has already been completed. Further submissions are prohibited." });
+      return;
+    }
+
+    if (attempt.status === "MALPRACTICE_LOCKED" || attempt.tabSwitchCount >= 2) {
+      res.status(403).json({
+        message: "Your assessment is currently locked due to malpractice violations. Submissions are prohibited until unlocked by an administrator.",
+        isLocked: true,
+      });
       return;
     }
 
@@ -311,6 +325,14 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
 
     if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
       res.status(403).json({ message: "This assessment has already been finalized and submitted." });
+      return;
+    }
+
+    if (attempt.status === "MALPRACTICE_LOCKED" || attempt.tabSwitchCount >= 2) {
+      res.status(403).json({
+        message: "Your assessment is currently locked due to malpractice violations. Submissions are prohibited until unlocked by an administrator.",
+        isLocked: true,
+      });
       return;
     }
 

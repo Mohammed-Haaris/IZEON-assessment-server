@@ -107,11 +107,19 @@ export function setupProctorSocket(io: SocketIOServer) {
           const { attemptId, remarks } = data;
           if (!attemptId) return;
 
-          // Reset status to Round 2 and set violation count to 1 (final grace)
+          // Reset status to appropriate round and set violation count to 1 (final grace)
+          const targetAttempt = await prisma.assessmentAttempt.findUnique({
+            where: { id: attemptId },
+          });
+          const restoredStatus =
+            targetAttempt?.currentRound === "ROUND_1_APTITUDE_VERBAL_WRITTEN"
+              ? "ROUND_1_IN_PROGRESS"
+              : "ROUND_2_IN_PROGRESS";
+
           await prisma.assessmentAttempt.update({
             where: { id: attemptId },
             data: {
-              status: "ROUND_2_IN_PROGRESS",
+              status: restoredStatus,
               tabSwitchCount: 1,
             },
           });

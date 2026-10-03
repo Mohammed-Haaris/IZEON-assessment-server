@@ -291,10 +291,15 @@ router.post("/attempts/:id/give-chance", async (req: AuthRequest, res: Response)
       return;
     }
 
+    const restoredStatus =
+      attempt.currentRound === "ROUND_1_APTITUDE_VERBAL_WRITTEN"
+        ? "ROUND_1_IN_PROGRESS"
+        : "ROUND_2_IN_PROGRESS";
+
     await prisma.assessmentAttempt.update({
       where: { id: attemptId },
       data: {
-        status: "ROUND_2_IN_PROGRESS",
+        status: restoredStatus,
         tabSwitchCount: 1, // Grace period strike
       },
     });
@@ -435,10 +440,18 @@ router.post("/malpractice-logs/:logId/decision", async (req: AuthRequest, res: R
 
       // 3. Update the corresponding attempt
       if (decision === "GIVEN_CHANCE") {
+        const targetAttempt = await prisma.assessmentAttempt.findUnique({
+          where: { id: log.attemptId },
+        });
+        const restoredStatus =
+          targetAttempt?.currentRound === "ROUND_1_APTITUDE_VERBAL_WRITTEN"
+            ? "ROUND_1_IN_PROGRESS"
+            : "ROUND_2_IN_PROGRESS";
+
         await prisma.assessmentAttempt.update({
           where: { id: log.attemptId },
           data: {
-            status: "ROUND_2_IN_PROGRESS",
+            status: restoredStatus,
             tabSwitchCount: 1,
           },
         });

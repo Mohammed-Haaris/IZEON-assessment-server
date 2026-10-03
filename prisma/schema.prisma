@@ -56,6 +56,9 @@ model User {
   position        String?
   dob             String?
   mobileNumber    String?
+  tenthMark       String?
+  twelfthMark     String?
+  cgpa            String?
   role            Role               @default(STUDENT)
   status          StudentStatus      @default(APPROVED)
   createdAt       DateTime           @default(now())

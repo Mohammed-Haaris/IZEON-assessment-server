@@ -30,6 +30,9 @@ router.get("/students", async (req: AuthRequest, res: Response) => {
         position: true,
         dob: true,
         mobileNumber: true,
+        tenthMark: true,
+        twelfthMark: true,
+        cgpa: true,
         status: true,
         createdAt: true,
         _count: {

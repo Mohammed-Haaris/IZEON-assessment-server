@@ -61,6 +61,8 @@ model User {
   cgpa            String?
   role            Role               @default(STUDENT)
   status          StudentStatus      @default(APPROVED)
+  resetToken      String?
+  resetTokenExpiry DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   attempts        AssessmentAttempt[]

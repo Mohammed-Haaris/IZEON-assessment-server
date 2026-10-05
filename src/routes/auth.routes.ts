@@ -253,7 +253,7 @@ router.post("/admin/forgot-password/request", async (req, res: Response) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Save passcode & expiry
-    await prisma.user.update({
+    await (prisma.user as any).update({
       where: { id: user.id },
       data: {
         resetToken: passcode,
@@ -294,7 +294,7 @@ router.post("/admin/forgot-password/verify-code", async (req, res: Response) => 
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({
+    const user: any = await (prisma.user as any).findUnique({
       where: { email: cleanEmail },
       select: { id: true, role: true, resetToken: true, resetTokenExpiry: true },
     });
@@ -311,7 +311,7 @@ router.post("/admin/forgot-password/verify-code", async (req, res: Response) => 
       user.resetToken &&
       user.resetToken === cleanCode &&
       user.resetTokenExpiry &&
-      user.resetTokenExpiry > new Date();
+      new Date(user.resetTokenExpiry) > new Date();
 
     if (!isCodeValid) {
       res.status(400).json({
@@ -355,7 +355,7 @@ router.post("/admin/forgot-password/reset", async (req, res: Response) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({
+    const user: any = await (prisma.user as any).findUnique({
       where: { email: cleanEmail },
       select: {
         id: true,
@@ -392,7 +392,7 @@ router.post("/admin/forgot-password/reset", async (req, res: Response) => {
         user.resetToken &&
         user.resetToken === cleanCode &&
         user.resetTokenExpiry &&
-        user.resetTokenExpiry > new Date()
+        new Date(user.resetTokenExpiry) > new Date()
       ) {
         isAuthorized = true;
       }
@@ -409,7 +409,7 @@ router.post("/admin/forgot-password/reset", async (req, res: Response) => {
     // Hash new password and clear reset token
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
+    await (prisma.user as any).update({
       where: { id: user.id },
       data: {
         password: hashedPassword,

@@ -137,6 +137,35 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// 4.1. Update assessment timers, passing criteria & metadata
+router.patch("/assessments/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { title, description, durationR1, durationR2, passingScore, isActive } = req.body;
+
+    const data: any = {};
+    if (durationR1 !== undefined) data.durationR1 = Math.max(1, parseInt(durationR1, 10));
+    if (durationR2 !== undefined) data.durationR2 = Math.max(1, parseInt(durationR2, 10));
+    if (passingScore !== undefined) data.passingScore = Math.max(0, parseInt(passingScore, 10));
+    if (title !== undefined && title.trim()) data.title = title.trim();
+    if (description !== undefined) data.description = description;
+    if (isActive !== undefined) data.isActive = Boolean(isActive);
+
+    const updatedAssessment = await prisma.assessment.update({
+      where: { id },
+      data,
+    });
+
+    res.json({
+      message: "Assessment timer and configuration updated successfully!",
+      assessment: updatedAssessment,
+    });
+  } catch (error: any) {
+    console.error("Update assessment error:", error);
+    res.status(500).json({ message: "Failed to update assessment", error: error.message });
+  }
+});
+
 // 5. Get questions for an assessment
 router.get("/assessments/:id/questions", async (req: AuthRequest, res: Response) => {
   try {

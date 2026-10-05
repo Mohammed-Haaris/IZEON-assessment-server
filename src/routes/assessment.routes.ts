@@ -220,6 +220,103 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// 2.5 Report Malpractice / Tab Switch (Direct REST fallback with real-time push)
+const lastTabSwitchRest = new Map<string, number>();
+
+router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
+  try {
+    const { attemptId, violationType = "TAB_SWITCH" } = req.body;
+    if (!attemptId) {
+      res.status(400).json({ message: "attemptId is required" });
+      return;
+    }
+
+    const now = Date.now();
+    const lastTime = lastTabSwitchRest.get(attemptId) || 0;
+    if (now - lastTime < 1000) {
+      res.json({ message: "Duplicate violation ignored within 1s window" });
+      return;
+    }
+    lastTabSwitchRest.set(attemptId, now);
+
+    const attempt = await prisma.assessmentAttempt.findUnique({
+      where: { id: attemptId },
+      include: { user: true, assessment: true },
+    });
+
+    if (!attempt) {
+      res.status(404).json({ message: "Attempt not found" });
+      return;
+    }
+
+    if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
+      res.json({ message: "Attempt already finalized", attempt });
+      return;
+    }
+
+    const newCount = attempt.tabSwitchCount + 1;
+    const isLocked = newCount >= 2;
+
+    const updatedAttempt = await prisma.assessmentAttempt.update({
+      where: { id: attemptId },
+      data: {
+        tabSwitchCount: newCount,
+        status: isLocked ? "MALPRACTICE_LOCKED" : attempt.status,
+      },
+    });
+
+    const log = await prisma.malpracticeLog.create({
+      data: {
+        attemptId: attempt.id,
+        userId: attempt.userId,
+        violationType,
+        violationCount: newCount,
+        adminDecision: isLocked ? "PENDING" : null,
+      },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      if (isLocked) {
+        io.to(`attempt:${attemptId}`).emit("proctor:locked", {
+          count: newCount,
+          message:
+            "Assessment locked due to multiple malpractice violations. Administrator has been notified to review your session.",
+        });
+        const alertPayload = {
+          attemptId: attempt.id,
+          logId: log.id,
+          studentId: attempt.user.id,
+          studentName: attempt.user.name,
+          studentEmail: attempt.user.email,
+          assessmentTitle: attempt.assessment.title,
+          violationType,
+          violationCount: newCount,
+          timestamp: new Date(),
+        };
+        io.to("admin_monitor").emit("admin:malpractice_alert", alertPayload);
+        io.emit("admin:malpractice_alert", alertPayload);
+      } else {
+        io.to(`attempt:${attemptId}`).emit("proctor:warning", {
+          count: 1,
+          message:
+            "Warning 1 of 2: Tab switch detected! One more tab switch will flag you for malpractice and lock your test.",
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      tabSwitchCount: newCount,
+      isLocked,
+      status: updatedAttempt.status,
+    });
+  } catch (error: any) {
+    console.error("Report malpractice error:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
 // 3. Submit Round 1 (Aptitude, Verbal, Written Assessment)
 router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
   try {

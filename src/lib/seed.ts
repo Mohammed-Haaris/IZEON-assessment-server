@@ -168,8 +168,8 @@ export async function seedDefaultData() {
           content:
             "You are given a database table `employees(id, name, department_id, salary, hire_date)`.\n\nWrite a SQL query that retrieves:\n1. `department_id`\n2. `COUNT(*) AS total_employees`\n3. `ROUND(AVG(salary), 2) AS avg_salary`\n\nFilter for only departments where average salary exceeds 50,000, and order the results by `avg_salary` in descending order.",
           starterCode: {
-            sql: `-- Write your SQL query here\nSELECT department_id, COUNT(*) AS total_employees, ROUND(AVG(salary), 2) AS avg_salary\nFROM employees\nGROUP BY department_id\nHAVING AVG(salary) > 50000\nORDER BY avg_salary DESC;`,
-            python: `# Or write in Python if generating SQL queries\nsql_query = """\nSELECT department_id, COUNT(*) AS total_employees, ROUND(AVG(salary), 2) AS avg_salary\nFROM employees\nGROUP BY department_id\nHAVING AVG(salary) > 50000\nORDER BY avg_salary DESC;\n"""`,
+            sql: `-- Write your SQL query here\n`,
+            python: `# Write your Python solution here\n`,
           },
           testCases: [
             {
@@ -188,7 +188,7 @@ export async function seedDefaultData() {
           content:
             "Write a Python function `analyze_transactions(transactions, threshold)` that takes:\n- `transactions`: A list of dicts, e.g. `[{'id': 1, 'amount': 150.0, 'category': 'Tech'}, {'id': 2, 'amount': 45.0, 'category': 'Office'}]`\n- `threshold`: A float number\n\nThe function should return a dictionary with:\n- `'total_volume'`: sum of all transaction amounts (float)\n- `'outlier_count'`: number of transactions where amount >= threshold\n- `'category_totals'`: a dict mapping each category to its sum of amounts.",
           starterCode: {
-            python: `def analyze_transactions(transactions, threshold):\n    """\n    Analyze transaction data and detect outliers.\n    """\n    total_volume = sum(t['amount'] for t in transactions)\n    outlier_count = sum(1 for t in transactions if t['amount'] >= threshold)\n    \n    category_totals = {}\n    for t in transactions:\n        cat = t.get('category', 'Unknown')\n        category_totals[cat] = category_totals.get(cat, 0.0) + t['amount']\n        \n    return {\n        'total_volume': round(total_volume, 2),\n        'outlier_count': outlier_count,\n        'category_totals': category_totals\n    }`,
+            python: `def analyze_transactions(transactions, threshold):\n    # Write your data analysis code here\n    pass\n`,
           },
           testCases: [
             {
@@ -239,8 +239,8 @@ export async function seedDefaultData() {
                 content:
                   "You are given a database table `employees(id, name, department_id, salary, hire_date)`.\n\nWrite a SQL query that retrieves:\n1. `department_id`\n2. `COUNT(*) AS total_employees`\n3. `ROUND(AVG(salary), 2) AS avg_salary`\n\nFilter for only departments where average salary exceeds 50,000, and order the results by `avg_salary` in descending order.",
                 starterCode: {
-                  sql: `-- Write your SQL query here\nSELECT department_id, COUNT(*) AS total_employees, ROUND(AVG(salary), 2) AS avg_salary\nFROM employees\nGROUP BY department_id\nHAVING AVG(salary) > 50000\nORDER BY avg_salary DESC;`,
-                  python: `# Or write in Python if generating SQL queries\nsql_query = """\nSELECT department_id, COUNT(*) AS total_employees, ROUND(AVG(salary), 2) AS avg_salary\nFROM employees\nGROUP BY department_id\nHAVING AVG(salary) > 50000\nORDER BY avg_salary DESC;\n"""`,
+                  sql: `-- Write your SQL query here\n`,
+                  python: `# Write your Python solution here\n`,
                 },
                 testCases: [
                   {
@@ -260,7 +260,7 @@ export async function seedDefaultData() {
                 content:
                   "Write a Python function `analyze_transactions(transactions, threshold)` that takes:\n- `transactions`: A list of dicts, e.g. `[{'id': 1, 'amount': 150.0, 'category': 'Tech'}, {'id': 2, 'amount': 45.0, 'category': 'Office'}]`\n- `threshold`: A float number\n\nThe function should return a dictionary with:\n- `'total_volume'`: sum of all transaction amounts (float)\n- `'outlier_count'`: number of transactions where amount >= threshold\n- `'category_totals'`: a dict mapping each category to its sum of amounts.",
                 starterCode: {
-                  python: `def analyze_transactions(transactions, threshold):\n    """\n    Analyze transaction data and detect outliers.\n    """\n    total_volume = sum(t['amount'] for t in transactions)\n    outlier_count = sum(1 for t in transactions if t['amount'] >= threshold)\n    \n    category_totals = {}\n    for t in transactions:\n        cat = t.get('category', 'Unknown')\n        category_totals[cat] = category_totals.get(cat, 0.0) + t['amount']\n        \n    return {\n        'total_volume': round(total_volume, 2),\n        'outlier_count': outlier_count,\n        'category_totals': category_totals\n    }`,
+                  python: `def analyze_transactions(transactions, threshold):\n    # Write your data analysis code here\n    pass\n`,
                 },
                 testCases: [
                   {
@@ -287,6 +287,33 @@ export async function seedDefaultData() {
             targetRole: "Software Developer",
           } as any,
         });
+
+        // Cleanse any existing questions where starterCode contains answers
+        const allQuestions = await prisma.question.findMany({
+          where: { round: "ROUND_2_CODING" },
+        });
+        for (const q of allQuestions) {
+          if (q.category === "SQL") {
+            await prisma.question.update({
+              where: { id: q.id },
+              data: {
+                starterCode: {
+                  sql: "-- Write your SQL query here\n",
+                  python: "# Write your Python solution here\n",
+                },
+              },
+            });
+          } else if (q.category === "PYTHON" && q.targetRole === "Data Analyst") {
+            await prisma.question.update({
+              where: { id: q.id },
+              data: {
+                starterCode: {
+                  python: "def analyze_transactions(transactions, threshold):\n    # Write your solution here\n    pass\n",
+                },
+              },
+            });
+          }
+        }
       }
     }
   } catch (error) {

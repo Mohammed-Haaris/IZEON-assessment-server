@@ -1,6 +1,8 @@
 import { Server as SocketIOServer, Socket } from "socket.io";
 import prisma from "../lib/prisma";
 
+const lastSocketTabSwitch = new Map<string, number>();
+
 export function setupProctorSocket(io: SocketIOServer) {
   io.on("connection", (socket: Socket) => {
     // 1. Join room
@@ -26,6 +28,13 @@ export function setupProctorSocket(io: SocketIOServer) {
           if (violationType === "WINDOW_BLUR") {
             return;
           }
+
+          const now = Date.now();
+          const lastTime = lastSocketTabSwitch.get(attemptId) || 0;
+          if (now - lastTime < 1000) {
+            return;
+          }
+          lastSocketTabSwitch.set(attemptId, now);
 
           const attempt = await prisma.assessmentAttempt.findUnique({
             where: { id: attemptId },

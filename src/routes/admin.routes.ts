@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import bcrypt from "bcrypt";
 import prisma from "../lib/prisma";
 import { authenticateToken, requireAdmin, AuthRequest } from "../middleware/auth.middleware";
+import { invalidateAssessmentCache } from "../lib/assessmentCache";
 
 const router = Router();
 
@@ -131,6 +132,8 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
       },
     });
 
+    invalidateAssessmentCache();
+
     res.status(201).json({ message: "Assessment created successfully", assessment });
   } catch (error: any) {
     res.status(500).json({ message: "Failed to create assessment", error: error.message });
@@ -155,6 +158,8 @@ router.patch("/assessments/:id", async (req: AuthRequest, res: Response) => {
       where: { id },
       data,
     });
+
+    invalidateAssessmentCache();
 
     res.json({
       message: "Assessment timer and configuration updated successfully!",
@@ -219,6 +224,8 @@ router.post("/assessments/:id/questions", async (req: AuthRequest, res: Response
       },
     });
 
+    invalidateAssessmentCache();
+
     res.status(201).json({ message: "Question added successfully", question });
   } catch (error: any) {
     console.error("Add question error:", error);
@@ -231,6 +238,7 @@ router.delete("/questions/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
     await prisma.question.delete({ where: { id } });
+    invalidateAssessmentCache();
     res.json({ message: "Question deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ message: "Failed to delete question", error: error.message });
@@ -240,7 +248,8 @@ router.delete("/questions/:id", async (req: AuthRequest, res: Response) => {
 // 8. Get all candidate attempts & proctoring status
 router.get("/attempts", async (req: AuthRequest, res: Response) => {
   try {
-    const attempts = await prisma.assessmentAttempt.findMany({
+    const { limit, offset } = req.query;
+    const queryOptions: any = {
       where: {
         user: { role: "STUDENT" },
       },
@@ -265,11 +274,21 @@ router.get("/attempts", async (req: AuthRequest, res: Response) => {
           select: { id: true, title: true, durationR1: true, durationR2: true, passingScore: true },
         },
         malpracticeLogs: {
+          take: 20,
           orderBy: { timestamp: "desc" },
         },
       },
       orderBy: { createdAt: "desc" },
-    });
+    };
+
+    if (limit) {
+      queryOptions.take = Math.min(1000, Math.max(1, parseInt(limit as string, 10)));
+    }
+    if (offset) {
+      queryOptions.skip = Math.max(0, parseInt(offset as string, 10));
+    }
+
+    const attempts = await prisma.assessmentAttempt.findMany(queryOptions);
 
     res.json({ attempts });
   } catch (error: any) {

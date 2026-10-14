@@ -1,13 +1,24 @@
 import { Server as SocketIOServer, Socket } from "socket.io";
 import prisma from "../lib/prisma";
 
+// Map with timestamp tracking and automatic pruning to prevent memory leaks
 const lastSocketTabSwitch = new Map<string, number>();
+
+// Periodic memory cleanup every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of lastSocketTabSwitch.entries()) {
+    if (now - timestamp > 5 * 60 * 1000) {
+      lastSocketTabSwitch.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 export function setupProctorSocket(io: SocketIOServer) {
   io.on("connection", (socket: Socket) => {
     // 1. Join room
     socket.on("join:attempt", (attemptId: string) => {
-      if (attemptId) {
+      if (attemptId && typeof attemptId === "string") {
         socket.join(`attempt:${attemptId}`);
       }
     });
@@ -58,7 +69,7 @@ export function setupProctorSocket(io: SocketIOServer) {
           });
 
           if (newCount === 1) {
-            // Strike 1: Update count and send warning
+            // Strike 1: Update count and send warning to target student only
             await prisma.assessmentAttempt.update({
               where: { id: attemptId },
               data: { tabSwitchCount: newCount },
@@ -79,7 +90,7 @@ export function setupProctorSocket(io: SocketIOServer) {
               },
             });
 
-            // Inform the student
+            // Inform only this student's room
             io.to(`attempt:${attemptId}`).emit("proctor:locked", {
               count: newCount,
               message:
@@ -98,9 +109,8 @@ export function setupProctorSocket(io: SocketIOServer) {
               timestamp: new Date(),
             };
 
-            // Trigger instant real-time alert to Admin Dashboard
+            // Trigger instant real-time alert ONLY to Admin Dashboard monitor room
             io.to("admin_monitor").emit("admin:malpractice_alert", alertPayload);
-            io.emit("admin:malpractice_alert", alertPayload);
           }
         } catch (error) {
           console.error("Error processing tab switch:", error);
@@ -116,7 +126,6 @@ export function setupProctorSocket(io: SocketIOServer) {
           const { attemptId, remarks } = data;
           if (!attemptId) return;
 
-          // Reset status to appropriate round and set violation count to 1 (final grace)
           const targetAttempt = await prisma.assessmentAttempt.findUnique({
             where: { id: attemptId },
           });
@@ -145,21 +154,16 @@ export function setupProctorSocket(io: SocketIOServer) {
             },
           });
 
-          // Unblock student screen
+          // Unblock student screen in their specific room only
           const unlockData = {
             attemptId,
             message:
               "The administrator has granted you another chance. Please return to fullscreen and do not leave the exam tab.",
           };
           io.to(`attempt:${attemptId}`).emit("proctor:unlocked", unlockData);
-          io.emit("proctor:unlocked", unlockData);
 
-          // Notify admins that incident was resolved
+          // Notify admins in the admin_monitor room only
           io.to("admin_monitor").emit("admin:action_resolved", {
-            attemptId,
-            decision: "GIVEN_CHANCE",
-          });
-          io.emit("admin:action_resolved", {
             attemptId,
             decision: "GIVEN_CHANCE",
           });
@@ -196,21 +200,16 @@ export function setupProctorSocket(io: SocketIOServer) {
             },
           });
 
-          // Disqualify student screen
+          // Disqualify student screen in their specific room only
           const disqData = {
             attemptId,
             message:
               "Your assessment has been disqualified by the administrator due to malpractice violations.",
           };
           io.to(`attempt:${attemptId}`).emit("proctor:disqualified", disqData);
-          io.emit("proctor:disqualified", disqData);
 
-          // Notify admins
+          // Notify admins in the admin_monitor room only
           io.to("admin_monitor").emit("admin:action_resolved", {
-            attemptId,
-            decision: "REJECTED",
-          });
-          io.emit("admin:action_resolved", {
             attemptId,
             decision: "REJECTED",
           });
@@ -221,7 +220,7 @@ export function setupProctorSocket(io: SocketIOServer) {
     );
 
     socket.on("disconnect", () => {
-      // client disconnected
+      // client disconnected cleanly
     });
   });
 }

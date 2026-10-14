@@ -5,192 +5,142 @@ import {
   requireApprovedStudent,
   AuthRequest,
 } from "../middleware/auth.middleware";
+import { getCachedActiveAssessment } from "../lib/assessmentCache";
 
 const router = Router();
 
 router.use(authenticateToken);
 router.use(requireApprovedStudent);
 
-// 1. Get active assessment for the student
+// Helper to filter questions by candidate role in memory
+function filterQuestionsForRole(questions: any[], studentRole?: string | null) {
+  if (!studentRole) return questions;
+
+  return questions.filter((q) => {
+    if (studentRole === "Software Developer") {
+      const matchRole =
+        q.targetRole === "ALL" ||
+        q.targetRole === "Software Developer" ||
+        !q.targetRole;
+      return matchRole && q.category !== "SQL";
+    }
+
+    if (studentRole === "Data Analyst") {
+      return (
+        q.targetRole === "ALL" ||
+        q.targetRole === "Data Analyst" ||
+        !q.targetRole
+      );
+    }
+
+    return (
+      q.targetRole === "ALL" ||
+      q.targetRole === studentRole ||
+      !q.targetRole
+    );
+  });
+}
+
+// 1. Get active assessment for the student (High performance cached read)
 router.get("/active", async (req: AuthRequest, res: Response) => {
   try {
     const studentRole = req.user?.position;
-    let roleWhere: any = {};
-    if (studentRole === "Software Developer") {
-      roleWhere = {
-        AND: [
-          {
-            OR: [
-              { targetRole: "ALL" },
-              { targetRole: "Software Developer" },
-              { targetRole: null },
-            ],
-          },
-          { category: { not: "SQL" } },
-        ],
-      };
-    } else if (studentRole === "Data Analyst") {
-      roleWhere = {
-        OR: [
-          { targetRole: "ALL" },
-          { targetRole: "Data Analyst" },
-          { targetRole: null },
-        ],
-      };
-    } else if (studentRole) {
-      roleWhere = {
-        OR: [
-          { targetRole: "ALL" },
-          { targetRole: studentRole },
-          { targetRole: null },
-        ],
-      };
-    }
+    const activeAssessment = await getCachedActiveAssessment();
 
-    const assessment: any = await prisma.assessment.findFirst({
-      where: { isActive: true },
-      include: {
-        questions: {
-          where: roleWhere as any,
-          select: {
-            id: true,
-            round: true,
-            category: true,
-            targetRole: true,
-            title: true,
-            content: true,
-            options: true,
-            points: true,
-            starterCode: true,
-            testCases: true,
-          } as any,
-        },
-        _count: {
-          select: { questions: true },
-        },
-      },
-    });
-
-    if (!assessment) {
+    if (!activeAssessment) {
       res.status(404).json({ message: "No active assessment found." });
       return;
     }
 
-    // Check if student already has a finished or ongoing attempt
-    const finishedAttempt = await prisma.assessmentAttempt.findFirst({
+    // Filter questions in memory for student role (0ms CPU operation)
+    const filteredQuestions = filterQuestionsForRole(activeAssessment.questions, studentRole);
+
+    const assessment = {
+      ...activeAssessment,
+      questions: filteredQuestions,
+      _count: {
+        questions: filteredQuestions.length,
+      },
+    };
+
+    // Single indexed query to fetch student's latest attempt
+    const existingAttempt = await prisma.assessmentAttempt.findFirst({
       where: {
         userId: req.user!.id,
-        assessmentId: assessment.id,
-        status: { in: ["COMPLETED", "DISQUALIFIED"] },
+        assessmentId: activeAssessment.id,
       },
       orderBy: { createdAt: "desc" },
     });
-
-    const ongoingAttempt = await prisma.assessmentAttempt.findFirst({
-      where: {
-        userId: req.user!.id,
-        assessmentId: assessment.id,
-        status: { notIn: ["COMPLETED", "DISQUALIFIED"] },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const existingAttempt = finishedAttempt || ongoingAttempt;
 
     res.json({ assessment, existingAttempt });
   } catch (error: any) {
+    console.error("Fetch active assessment error:", error);
     res.status(500).json({ message: "Internal server error", error: error.message });
   }
 });
 
-// 2. Start Assessment
+// 2. Start Assessment (High performance cached read + single attempt check)
 router.post("/start", async (req: AuthRequest, res: Response) => {
   try {
     const { assessmentId } = req.body;
     const studentRole = req.user?.position;
 
-    const round1Where: any = {
-      round: "ROUND_1_APTITUDE_VERBAL_WRITTEN",
-    };
-    if (studentRole) {
-      round1Where.OR = [
-        { targetRole: "ALL" },
-        { targetRole: studentRole },
-        { targetRole: null },
-      ];
+    // Use cached active assessment if no specific id or matches active id
+    let assessment = await getCachedActiveAssessment();
+    if (!assessment || (assessmentId && assessment.id !== assessmentId)) {
+      assessment = assessmentId
+        ? await prisma.assessment.findUnique({
+            where: { id: assessmentId },
+            include: { questions: true },
+          })
+        : await prisma.assessment.findFirst({
+            where: { isActive: true },
+            include: { questions: true },
+          });
     }
-
-    const assessment: any = assessmentId
-      ? await prisma.assessment.findUnique({
-          where: { id: assessmentId },
-          include: {
-            questions: {
-              where: round1Where as any,
-              select: {
-                id: true,
-                round: true,
-                category: true,
-                targetRole: true,
-                title: true,
-                content: true,
-                options: true,
-                points: true,
-              } as any,
-            },
-          },
-        })
-      : await prisma.assessment.findFirst({
-          where: { isActive: true },
-          include: {
-            questions: {
-              where: round1Where as any,
-              select: {
-                id: true,
-                round: true,
-                category: true,
-                targetRole: true,
-                title: true,
-                content: true,
-                options: true,
-                points: true,
-              } as any,
-            },
-          },
-        });
 
     if (!assessment || !assessment.isActive) {
       res.status(404).json({ message: "Active assessment not found." });
       return;
     }
 
-    // 1. Strictly block retakes if student already COMPLETED or was DISQUALIFIED
-    const alreadyFinished = await prisma.assessmentAttempt.findFirst({
+    // In-memory filter for Round 1 questions
+    const round1Questions = filterQuestionsForRole(
+      (assessment.questions || []).filter(
+        (q: any) => q.round === "ROUND_1_APTITUDE_VERBAL_WRITTEN"
+      ),
+      studentRole
+    ).map((q: any) => ({
+      id: q.id,
+      round: q.round,
+      category: q.category,
+      targetRole: q.targetRole,
+      title: q.title,
+      content: q.content,
+      options: q.options,
+      points: q.points,
+    }));
+
+    // Single indexed query for student's attempt
+    let attempt = await prisma.assessmentAttempt.findFirst({
       where: {
         userId: req.user!.id,
         assessmentId: assessment.id,
-        status: { in: ["COMPLETED", "DISQUALIFIED"] },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    if (alreadyFinished) {
+    // 1. Strictly block retakes if student already COMPLETED or was DISQUALIFIED
+    if (attempt && (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED")) {
       res.status(403).json({
         message: "You have already completed this assessment. Resuming or retaking is strictly not permitted.",
-        attempt: alreadyFinished,
+        attempt,
         alreadyFinished: true,
       });
       return;
     }
 
-    // 2. Check existing in-progress attempt
-    let attempt = await prisma.assessmentAttempt.findFirst({
-      where: {
-        userId: req.user!.id,
-        assessmentId: assessment.id,
-        status: { notIn: ["COMPLETED", "DISQUALIFIED"] },
-      },
-    });
-
+    // 2. Create attempt if not started yet
     if (!attempt) {
       attempt = await prisma.assessmentAttempt.create({
         data: {
@@ -211,7 +161,7 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
       lockMessage: isLocked
         ? "Assessment locked due to multiple malpractice violations. Administrator has been notified to review your session."
         : undefined,
-      round1Questions: assessment.questions,
+      round1Questions,
       durationR1: assessment.durationR1,
     });
   } catch (error: any) {
@@ -222,6 +172,16 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
 
 // 2.5 Report Malpractice / Tab Switch (Direct REST fallback with real-time push)
 const lastTabSwitchRest = new Map<string, number>();
+
+// Periodic memory pruning to prevent leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of lastTabSwitchRest.entries()) {
+    if (now - timestamp > 5 * 60 * 1000) {
+      lastTabSwitchRest.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
   try {
@@ -278,6 +238,7 @@ router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
     const io = req.app.get("io");
     if (io) {
       if (isLocked) {
+        // Send alert ONLY to candidate room
         io.to(`attempt:${attemptId}`).emit("proctor:locked", {
           count: newCount,
           message:
@@ -294,8 +255,8 @@ router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
           violationCount: newCount,
           timestamp: new Date(),
         };
+        // Send alert ONLY to admin monitor room (prevents broadcasting to 1000 other students)
         io.to("admin_monitor").emit("admin:malpractice_alert", alertPayload);
-        io.emit("admin:malpractice_alert", alertPayload);
       } else {
         io.to(`attempt:${attemptId}`).emit("proctor:warning", {
           count: 1,

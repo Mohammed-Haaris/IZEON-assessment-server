@@ -67,6 +67,8 @@ model User {
   updatedAt       DateTime           @updatedAt
   attempts        AssessmentAttempt[]
   malpracticeLogs MalpracticeLog[]
+
+  @@index([role, status])
 }
 
 model Assessment {
@@ -81,6 +83,8 @@ model Assessment {
   attempts     AssessmentAttempt[]
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
+
+  @@index([isActive])
 }
 
 model Question {
@@ -101,6 +105,9 @@ model Question {
   testCases     Json?            // [{ "input": "...", "output": "...", "isHidden": false }]
   
   createdAt     DateTime         @default(now())
+
+  @@index([assessmentId, round])
+  @@index([round, targetRole])
 }
 
 model AssessmentAttempt {
@@ -124,6 +131,11 @@ model AssessmentAttempt {
   createdAt       DateTime         @default(now())
   
   malpracticeLogs MalpracticeLog[]
+
+  @@index([userId, assessmentId])
+  @@index([userId, status])
+  @@index([assessmentId, status])
+  @@index([status])
 }
 
 model MalpracticeLog {
@@ -138,4 +150,10 @@ model MalpracticeLog {
   adminDecision  String?           // "PENDING", "GIVEN_CHANCE", "REJECTED"
   adminRemarks   String?
   timestamp      DateTime          @default(now())
+
+  @@index([attemptId])
+  @@index([userId])
+  @@index([adminDecision])
+  @@index([timestamp])
 }
+

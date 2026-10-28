@@ -38,6 +38,7 @@ export async function seedDefaultData() {
           durationR1: 25, // 25 mins
           durationR2: 40, // 40 mins
           passingScore: 60,
+          cutoffRound1: 12,
           isActive: true,
         },
       });

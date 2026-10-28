@@ -78,6 +78,7 @@ model Assessment {
   durationR1   Int                 @default(30) // in minutes
   durationR2   Int                 @default(45) // in minutes
   passingScore Int?                @default(60)
+  cutoffRound1 Int?                @default(12) // Minimum score required in Round 1 to qualify for Round 2
   isActive     Boolean             @default(true)
   questions    Question[]
   attempts     AssessmentAttempt[]

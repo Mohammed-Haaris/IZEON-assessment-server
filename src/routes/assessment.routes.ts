@@ -325,14 +325,19 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
       }
     });
 
-    // Update attempt
+    // Determine qualification for Round 2 based on Admin-configured Cutoff
+    const cutoffRound1 = (attempt.assessment as any).cutoffRound1 ?? 12;
+    const isQualified = round1Score >= cutoffRound1;
+
+    // Update attempt: If not qualified, mark COMPLETED and lock out of Round 2
     const updatedAttempt = await prisma.assessmentAttempt.update({
       where: { id: attemptId },
       data: {
         round1Score,
         writtenEssay: writtenEssay || "",
-        status: "ROUND_2_IN_PROGRESS",
-        currentRound: "ROUND_2_CODING",
+        status: isQualified ? "ROUND_2_IN_PROGRESS" : "COMPLETED",
+        currentRound: isQualified ? "ROUND_2_CODING" : "ROUND_1_APTITUDE_VERBAL_WRITTEN",
+        completedAt: isQualified ? null : new Date(),
         answers: {
           ...(typeof attempt.answers === "object" && attempt.answers !== null ? attempt.answers : {}),
           round1Answers: mcqAnswers,
@@ -340,44 +345,51 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Fetch Round 2 coding questions (hide hidden test cases)
+    // Fetch Round 2 coding questions only if student qualified
     const studentRole = req.user?.position;
-    const codingQuestions = ((attempt.assessment.questions as any[]) || [])
-      .filter((q: any) => {
-        if (q.round !== "ROUND_2_CODING") return false;
-        if (!studentRole) return true;
-        if (studentRole === "Data Analyst") {
-          return q.targetRole === "Data Analyst" || q.targetRole === "ALL" || !q.targetRole;
-        }
-        if (studentRole === "Software Developer") {
-          return (
-            (q.targetRole === "Software Developer" || q.targetRole === "ALL" || !q.targetRole) &&
-            q.category !== "SQL"
-          );
-        }
-        return true;
-      })
-      .map((q: any) => {
-        let publicTestCases = [];
-        if (Array.isArray(q.testCases)) {
-          publicTestCases = (q.testCases as any[]).filter((tc) => !tc.isHidden);
-        }
-        return {
-          id: q.id,
-          title: q.title,
-          content: q.content,
-          category: q.category,
-          targetRole: q.targetRole,
-          points: q.points,
-          starterCode: q.starterCode,
-          testCases: publicTestCases,
-        };
-      });
+    const codingQuestions = isQualified
+      ? ((attempt.assessment.questions as any[]) || [])
+          .filter((q: any) => {
+            if (q.round !== "ROUND_2_CODING") return false;
+            if (!studentRole) return true;
+            if (studentRole === "Data Analyst") {
+              return q.targetRole === "Data Analyst" || q.targetRole === "ALL" || !q.targetRole;
+            }
+            if (studentRole === "Software Developer") {
+              return (
+                (q.targetRole === "Software Developer" || q.targetRole === "ALL" || !q.targetRole) &&
+                q.category !== "SQL"
+              );
+            }
+            return true;
+          })
+          .map((q: any) => {
+            let publicTestCases = [];
+            if (Array.isArray(q.testCases)) {
+              publicTestCases = (q.testCases as any[]).filter((tc) => !tc.isHidden);
+            }
+            return {
+              id: q.id,
+              title: q.title,
+              content: q.content,
+              category: q.category,
+              targetRole: q.targetRole,
+              points: q.points,
+              starterCode: q.starterCode,
+              testCases: publicTestCases,
+            };
+          })
+      : [];
 
     res.json({
-      message: "Round 1 completed successfully! Proceeding to Round 2.",
-      attempt: updatedAttempt,
+      success: true,
+      isQualified,
+      cutoffRound1,
       round1Score,
+      message: isQualified
+        ? "Congratulations! You have qualified for Round 2 (Coding & Technical Assessment)."
+        : `Assessment Completed. Your Round 1 score is ${round1Score} pts (Cutoff: ${cutoffRound1} pts). You have not qualified for Round 2.`,
+      attempt: updatedAttempt,
       codingQuestions,
       durationR2: attempt.assessment.durationR2,
     });

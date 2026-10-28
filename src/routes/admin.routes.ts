@@ -113,6 +113,7 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
       durationR1 = 30,
       durationR2 = 45,
       passingScore = 60,
+      cutoffRound1 = 12,
       isActive = true,
     } = req.body;
 
@@ -128,6 +129,7 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
         durationR1: Number(durationR1),
         durationR2: Number(durationR2),
         passingScore: Number(passingScore),
+        cutoffRound1: Number(cutoffRound1),
         isActive: Boolean(isActive),
       },
     });
@@ -144,12 +146,13 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
 router.patch("/assessments/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { title, description, durationR1, durationR2, passingScore, isActive } = req.body;
+    const { title, description, durationR1, durationR2, passingScore, cutoffRound1, isActive } = req.body;
 
     const data: any = {};
     if (durationR1 !== undefined) data.durationR1 = Math.max(1, parseInt(durationR1, 10));
     if (durationR2 !== undefined) data.durationR2 = Math.max(1, parseInt(durationR2, 10));
     if (passingScore !== undefined) data.passingScore = Math.max(0, parseInt(passingScore, 10));
+    if (cutoffRound1 !== undefined) data.cutoffRound1 = Math.max(0, parseInt(cutoffRound1, 10));
     if (title !== undefined && title.trim()) data.title = title.trim();
     if (description !== undefined) data.description = description;
     if (isActive !== undefined) data.isActive = Boolean(isActive);

@@ -6,6 +6,7 @@ import {
   AuthRequest,
 } from "../middleware/auth.middleware";
 import { getCachedActiveAssessment } from "../lib/assessmentCache";
+import { evaluateCodingAnswer } from "../lib/codeEvaluator";
 
 const router = Router();
 
@@ -373,7 +374,7 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
     });
 
     // Determine qualification for Round 2 based on Admin-configured Cutoff
-    const cutoffRound1 = (attempt.assessment as any).cutoffRound1 ?? 12;
+    const cutoffRound1 = (attempt.assessment as any).cutoffRound1 ?? 30;
     const isQualified = round1Score >= cutoffRound1;
 
     // Update attempt: If not qualified, mark COMPLETED and lock out of Round 2
@@ -484,23 +485,27 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Calculate score for Round 2 — coding questions + NE MCQ questions
+    // Calculate score for Round 2 — intelligent evaluation for SQL, Python, DSA and MCQ
     let round2Score = 0;
     const r2Questions = attempt.assessment.questions.filter((q) => q.round === "ROUND_2_CODING");
+    const gradingDetails: Record<string, any> = {};
+
     r2Questions.forEach((q: any) => {
-      if (q.options && q.correctAnswer) {
-        // Grade theoretical MCQ answer for Network Engineer
-        const studentAns = mcqAnswers?.[q.id] || codeAnswers?.[q.id];
-        if (studentAns && studentAns.trim() === q.correctAnswer.trim()) {
-          round2Score += q.points || 25;
-        }
-      } else {
-        // Grade code/query answer by length heuristic
-        const code = codeAnswers?.[q.id];
-        if (code && typeof code === "string" && code.trim().length > 25) {
-          round2Score += q.points || 50;
-        }
-      }
+      const submitted =
+        q.options && q.correctAnswer
+          ? mcqAnswers?.[q.id] || codeAnswers?.[q.id]
+          : codeAnswers?.[q.id];
+
+      const evalResult = evaluateCodingAnswer(submitted, q);
+      round2Score += evalResult.score;
+      gradingDetails[q.id] = {
+        title: q.title,
+        category: q.category,
+        score: evalResult.score,
+        maxPoints: evalResult.maxPoints,
+        feedback: evalResult.feedback,
+        isPassed: evalResult.isPassed,
+      };
     });
 
     const updatedAttempt = await prisma.assessmentAttempt.update({
@@ -513,6 +518,7 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
           ...(typeof attempt.answers === "object" && attempt.answers !== null ? attempt.answers : {}),
           codingAnswers: codeAnswers,
           networkingAnswers: mcqAnswers,
+          round2Grading: gradingDetails,
         },
       },
     });

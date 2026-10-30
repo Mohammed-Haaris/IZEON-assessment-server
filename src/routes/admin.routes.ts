@@ -248,6 +248,83 @@ router.delete("/questions/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// 7.1 Update existing question & its points/options/content
+router.put("/questions/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const {
+      round,
+      category,
+      targetRole,
+      title,
+      content,
+      options,
+      correctAnswer,
+      points,
+      starterCode,
+      testCases,
+    } = req.body;
+
+    const existing = await prisma.question.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ message: "Question not found" });
+      return;
+    }
+
+    const updated = await prisma.question.update({
+      where: { id },
+      data: {
+        ...(round ? { round } : {}),
+        ...(category ? { category } : {}),
+        ...(targetRole !== undefined ? { targetRole: targetRole || "ALL" } : {}),
+        ...(title !== undefined ? { title } : {}),
+        ...(content !== undefined ? { content } : {}),
+        ...(points !== undefined ? { points: Number(points) } : {}),
+        ...(options !== undefined
+          ? { options: options ? (typeof options === "string" ? JSON.parse(options) : options) : null }
+          : {}),
+        ...(correctAnswer !== undefined ? { correctAnswer } : {}),
+        ...(starterCode !== undefined
+          ? { starterCode: starterCode ? (typeof starterCode === "string" ? JSON.parse(starterCode) : starterCode) : null }
+          : {}),
+        ...(testCases !== undefined
+          ? { testCases: testCases ? (typeof testCases === "string" ? JSON.parse(testCases) : testCases) : null }
+          : {}),
+      },
+    });
+
+    invalidateAssessmentCache();
+
+    res.json({ message: "Question updated successfully", question: updated });
+  } catch (error: any) {
+    console.error("Update question error:", error);
+    res.status(500).json({ message: "Failed to update question", error: error.message });
+  }
+});
+
+// 7.2 Quick edit question points
+router.patch("/questions/:id/points", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { points } = req.body;
+    if (points === undefined || isNaN(Number(points))) {
+      res.status(400).json({ message: "Valid points number required" });
+      return;
+    }
+
+    const updated = await prisma.question.update({
+      where: { id },
+      data: { points: Number(points) },
+    });
+
+    invalidateAssessmentCache();
+
+    res.json({ message: "Question points updated successfully", question: updated });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to update points", error: error.message });
+  }
+});
+
 // 8. Get all candidate attempts & proctoring status
 router.get("/attempts", async (req: AuthRequest, res: Response) => {
   try {

@@ -250,3 +250,4 @@ export const additionalSoftwareDevQuestions = [
     points: 60,
   },
 ];
+

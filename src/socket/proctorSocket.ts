@@ -42,7 +42,7 @@ export function setupProctorSocket(io: SocketIOServer) {
 
           const now = Date.now();
           const lastTime = lastSocketTabSwitch.get(attemptId) || 0;
-          if (now - lastTime < 1000) {
+          if (now - lastTime < 2000) {
             return;
           }
           lastSocketTabSwitch.set(attemptId, now);
@@ -53,9 +53,24 @@ export function setupProctorSocket(io: SocketIOServer) {
           });
 
           if (!attempt) return;
-          if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") return;
+          if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED" || attempt.status === "MALPRACTICE_LOCKED") return;
 
           const newCount = attempt.tabSwitchCount + 1;
+
+          // Deduplicate strikes: prevent duplicate log if this strike was already recorded
+          const existingStrikeLog = await prisma.malpracticeLog.findFirst({
+            where: {
+              attemptId: attempt.id,
+              violationCount: newCount,
+            },
+          });
+          const recentLog = await prisma.malpracticeLog.findFirst({
+            where: {
+              attemptId: attempt.id,
+              timestamp: { gte: new Date(Date.now() - 2500) },
+            },
+          });
+          if (existingStrikeLog || recentLog) return;
 
           // Record malpractice incident log
           const log = await prisma.malpracticeLog.create({

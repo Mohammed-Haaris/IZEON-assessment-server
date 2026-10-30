@@ -315,7 +315,7 @@ router.delete("/attempts/:id", async (req: AuthRequest, res: Response) => {
 // 9. Get malpractice logs
 router.get("/malpractice-logs", async (req: AuthRequest, res: Response) => {
   try {
-    const logs = await prisma.malpracticeLog.findMany({
+    const rawLogs = await prisma.malpracticeLog.findMany({
       include: {
         user: { select: { id: true, name: true, email: true } },
         attempt: { select: { id: true, assessmentId: true, status: true, tabSwitchCount: true } },
@@ -323,7 +323,30 @@ router.get("/malpractice-logs", async (req: AuthRequest, res: Response) => {
       orderBy: { timestamp: "desc" },
     });
 
-    res.json({ logs });
+    // Deduplicate any historical duplicate rows
+    const seen = new Set<string>();
+    const duplicateIdsToDelete: string[] = [];
+    const uniqueLogs: typeof rawLogs = [];
+
+    for (const log of rawLogs) {
+      const key = `${log.attemptId}_${log.violationCount}`;
+      if (seen.has(key)) {
+        duplicateIdsToDelete.push(log.id);
+      } else {
+        seen.add(key);
+        uniqueLogs.push(log);
+      }
+    }
+
+    if (duplicateIdsToDelete.length > 0) {
+      prisma.malpracticeLog
+        .deleteMany({
+          where: { id: { in: duplicateIdsToDelete } },
+        })
+        .catch((err) => console.error("Pruning duplicate malpractice logs error:", err));
+    }
+
+    res.json({ logs: uniqueLogs });
   } catch (error: any) {
     res.status(500).json({ message: "Internal server error", error: error.message });
   }

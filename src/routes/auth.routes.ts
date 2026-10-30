@@ -7,6 +7,8 @@ import { authenticateToken, AuthRequest } from "../middleware/auth.middleware";
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "izeon_super_secret_jwt_key_2026";
 
+const inFlightRegistrations = new Set<string>();
+
 // Register
 router.post("/register", async (req, res: Response) => {
   try {
@@ -29,6 +31,13 @@ router.post("/register", async (req, res: Response) => {
       res.status(400).json({ message: "Name, email, and password are required" });
       return;
     }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    if (inFlightRegistrations.has(normalizedEmail)) {
+      res.status(429).json({ message: "Registration already in progress for this email. Please wait." });
+      return;
+    }
+    inFlightRegistrations.add(normalizedEmail);
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -92,6 +101,10 @@ router.post("/register", async (req, res: Response) => {
   } catch (error: any) {
     console.error("Register error:", error);
     res.status(500).json({ message: "Internal server error", error: error.message });
+  } finally {
+    if (req.body?.email) {
+      inFlightRegistrations.delete(req.body.email.toLowerCase().trim());
+    }
   }
 });
 

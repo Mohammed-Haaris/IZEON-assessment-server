@@ -33,6 +33,14 @@ function filterQuestionsForRole(questions: any[], studentRole?: string | null) {
       );
     }
 
+    if (studentRole === "Network Engineer") {
+      return (
+        q.targetRole === "ALL" ||
+        q.targetRole === "Network Engineer" ||
+        !q.targetRole
+      );
+    }
+
     return (
       q.targetRole === "ALL" ||
       q.targetRole === studentRole ||
@@ -78,6 +86,9 @@ router.get("/active", async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Internal server error", error: error.message });
   }
 });
+
+// Concurrency mutex lock per student starting assessment to prevent duplicate attempts on double click
+const activeStartsMutex = new Set<string>();
 
 // 2. Start Assessment (High performance cached read + single attempt check)
 router.post("/start", async (req: AuthRequest, res: Response) => {
@@ -142,15 +153,26 @@ router.post("/start", async (req: AuthRequest, res: Response) => {
 
     // 2. Create attempt if not started yet
     if (!attempt) {
-      attempt = await prisma.assessmentAttempt.create({
-        data: {
+      // Re-verify against database to prevent race conditions on double click
+      attempt = await prisma.assessmentAttempt.findFirst({
+        where: {
           userId: req.user!.id,
           assessmentId: assessment.id,
-          status: "ROUND_1_IN_PROGRESS",
-          currentRound: "ROUND_1_APTITUDE_VERBAL_WRITTEN",
-          startedAt: new Date(),
         },
+        orderBy: { createdAt: "desc" },
       });
+
+      if (!attempt) {
+        attempt = await prisma.assessmentAttempt.create({
+          data: {
+            userId: req.user!.id,
+            assessmentId: assessment.id,
+            status: "ROUND_1_IN_PROGRESS",
+            currentRound: "ROUND_1_APTITUDE_VERBAL_WRITTEN",
+            startedAt: new Date(),
+          },
+        });
+      }
     }
 
     const isLocked = attempt.status === "MALPRACTICE_LOCKED" || attempt.tabSwitchCount >= 2;
@@ -193,7 +215,7 @@ router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
 
     const now = Date.now();
     const lastTime = lastTabSwitchRest.get(attemptId) || 0;
-    if (now - lastTime < 1000) {
+    if (now - lastTime < 2000) {
       res.json({ message: "Duplicate violation ignored within 1s window" });
       return;
     }
@@ -209,13 +231,38 @@ router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED") {
-      res.json({ message: "Attempt already finalized", attempt });
+    if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED" || attempt.status === "MALPRACTICE_LOCKED") {
+      res.json({ message: "Attempt already finalized or locked", attempt });
       return;
     }
 
     const newCount = attempt.tabSwitchCount + 1;
     const isLocked = newCount >= 2;
+
+    // Deduplicate strikes: prevent duplicate log if this strike was already recorded
+    const existingStrikeLog = await prisma.malpracticeLog.findFirst({
+      where: {
+        attemptId: attempt.id,
+        violationCount: newCount,
+      },
+    });
+    const recentLog = await prisma.malpracticeLog.findFirst({
+      where: {
+        attemptId: attempt.id,
+        timestamp: { gte: new Date(Date.now() - 2500) },
+      },
+    });
+
+    if (existingStrikeLog || recentLog) {
+      res.json({
+        success: true,
+        message: "Duplicate violation ignored",
+        tabSwitchCount: attempt.tabSwitchCount,
+        isLocked,
+        status: attempt.status,
+      });
+      return;
+    }
 
     const updatedAttempt = await prisma.assessmentAttempt.update({
       where: { id: attemptId },
@@ -361,6 +408,12 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
                 q.category !== "SQL"
               );
             }
+            if (studentRole === "Network Engineer") {
+              return (
+                (q.targetRole === "Network Engineer" || q.targetRole === "ALL" || !q.targetRole) &&
+                q.category !== "SQL"
+              );
+            }
             return true;
           })
           .map((q: any) => {
@@ -402,7 +455,7 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
 // 4. Submit Round 2 (Coding)
 router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
   try {
-    const { attemptId, codeAnswers } = req.body;
+    const { attemptId, codeAnswers, mcqAnswers } = req.body;
 
     const attempt = await prisma.assessmentAttempt.findUnique({
       where: { id: attemptId },
@@ -431,13 +484,22 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Calculate score for Round 2 code/query submissions
+    // Calculate score for Round 2 — coding questions + NE MCQ questions
     let round2Score = 0;
     const r2Questions = attempt.assessment.questions.filter((q) => q.round === "ROUND_2_CODING");
-    r2Questions.forEach((q) => {
-      const code = codeAnswers?.[q.id];
-      if (code && typeof code === "string" && code.trim().length > 25) {
-        round2Score += q.points || 50;
+    r2Questions.forEach((q: any) => {
+      if (q.options && q.correctAnswer) {
+        // Grade theoretical MCQ answer for Network Engineer
+        const studentAns = mcqAnswers?.[q.id] || codeAnswers?.[q.id];
+        if (studentAns && studentAns.trim() === q.correctAnswer.trim()) {
+          round2Score += q.points || 25;
+        }
+      } else {
+        // Grade code/query answer by length heuristic
+        const code = codeAnswers?.[q.id];
+        if (code && typeof code === "string" && code.trim().length > 25) {
+          round2Score += q.points || 50;
+        }
       }
     });
 
@@ -450,6 +512,7 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
         answers: {
           ...(typeof attempt.answers === "object" && attempt.answers !== null ? attempt.answers : {}),
           codingAnswers: codeAnswers,
+          networkingAnswers: mcqAnswers,
         },
       },
     });

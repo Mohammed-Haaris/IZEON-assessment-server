@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import { Server as SocketIOServer } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import Redis from "ioredis";
 
 import authRoutes from "./src/routes/auth.routes";
 import adminRoutes from "./src/routes/admin.routes";
@@ -41,7 +43,7 @@ app.use(express.json({ limit: "10mb" }));
 // General Rate Limiter - generous enough for 1000 students, prevents malicious DDoS
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3000, // max 3000 requests per 15 mins per IP
+  max: 15000, // max 3000 requests per 15 mins per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many requests from this IP, please try again later." },
@@ -86,6 +88,23 @@ const io = new SocketIOServer(server, {
   transports: ["websocket", "polling"],
   maxHttpBufferSize: 1e6, // 1MB
 });
+
+// Configure Redis adapter for multi-instance horizontal scaling (Railway / Production)
+if (process.env.REDIS_URL) {
+  try {
+    const pubClient = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    });
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log("✅ Socket.IO Redis Adapter initialized successfully for horizontal scaling");
+  } catch (err) {
+    console.error("⚠️ Failed to connect Socket.IO Redis Adapter, running in standalone mode:", err);
+  }
+} else {
+  console.log("ℹ️ REDIS_URL not set: Socket.IO running in standalone in-memory mode");
+}
 
 // Initialize proctoring sockets
 app.set("io", io);

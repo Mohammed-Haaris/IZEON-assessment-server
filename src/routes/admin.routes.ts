@@ -412,7 +412,16 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
       }
     }
 
-    // 6. Ensure Network Engineer has 5 questions (10 pts each)
+    // 6. Delete legacy MCQ questions for Network Engineer so only practical problems remain
+    await (prisma.question as any).deleteMany({
+      where: {
+        assessmentId: id,
+        targetRole: "Network Engineer",
+        options: { not: null },
+      } as any,
+    });
+
+    // Ensure Network Engineer has 5 questions (10 pts each)
     for (const q of networkEngineerQuestions) {
       const existing = await prisma.question.findFirst({
         where: { assessmentId: id, title: q.title },
@@ -441,7 +450,7 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
             targetRole: "Network Engineer",
             category: q.category as any,
             content: q.content,
-            starterCode: (q as any).starterCode || null,
+            starterCode: (q as any).sarterCode || null,
             testCases: (q as any).testCases || null,
             options: (q as any).options || null,
             correctAnswer: (q as any).correctAnswer || null,

@@ -139,7 +139,16 @@ export async function seedDefaultData() {
       }
     }
 
-    // 6. Synchronize Network Engineer Questions (5 Questions, 10 Marks Each = 50 Marks)
+    // 6. Delete legacy MCQ questions for Network Engineer so only practical problems remain
+    await (prisma.question as any).deleteMany({
+      where: {
+        assessmentId: activeAssessment.id,
+        targetRole: "Network Engineer",
+        options: { not: null },
+      } as any,
+    });
+
+    // Synchronize Network Engineer Questions (5 Questions, 10 Marks Each = 50 Marks)
     for (const q of networkEngineerQuestions) {
       const existing = await prisma.question.findFirst({
         where: { assessmentId: activeAssessment.id, title: q.title },

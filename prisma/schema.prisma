@@ -33,6 +33,7 @@ enum QuestionCategory {
   CODING
   SQL
   PYTHON
+  NETWORKING
 }
 
 enum AttemptStatus {

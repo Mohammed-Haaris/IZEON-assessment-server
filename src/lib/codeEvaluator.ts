@@ -229,6 +229,54 @@ export function evaluateCodingAnswer(code: any, question: any): EvaluationResult
     };
   }
 
+  // Longest Prefix Match (LPM) Evaluation
+  if (titleLower.includes("prefix") || titleLower.includes("lpm") || titleLower.includes("routing")) {
+    let score = 0;
+    if (hasFunctionDef) score += Math.floor(maxPoints * 0.2);
+    if (hasControlFlow) score += Math.floor(maxPoints * 0.3);
+    if (/prefix|next_hop|drop/i.test(raw)) score += Math.floor(maxPoints * 0.3);
+    if (hasReturn) score += Math.floor(maxPoints * 0.2);
+    const finalScore = Math.min(score, maxPoints);
+    return {
+      score: finalScore,
+      maxPoints,
+      feedback: finalScore >= maxPoints * 0.6 ? "Longest Prefix Match routing logic implemented." : "Incomplete LPM logic.",
+      isPassed: finalScore >= maxPoints * 0.6,
+    };
+  }
+
+  // Firewall ACL Rule Evaluation
+  if (titleLower.includes("firewall") || titleLower.includes("acl") || titleLower.includes("permit")) {
+    let score = 0;
+    if (hasFunctionDef) score += Math.floor(maxPoints * 0.2);
+    if (hasControlFlow) score += Math.floor(maxPoints * 0.3);
+    if (/permit|deny|protocol|port/i.test(raw)) score += Math.floor(maxPoints * 0.3);
+    if (hasReturn) score += Math.floor(maxPoints * 0.2);
+    const finalScore = Math.min(score, maxPoints);
+    return {
+      score: finalScore,
+      maxPoints,
+      feedback: finalScore >= maxPoints * 0.6 ? "Firewall packet ACL filtering logic implemented." : "Incomplete ACL logic.",
+      isPassed: finalScore >= maxPoints * 0.6,
+    };
+  }
+
+  // Switch Interface & VLAN Config Parser Evaluation
+  if (titleLower.includes("vlan") || titleLower.includes("switch") || titleLower.includes("interface")) {
+    let score = 0;
+    if (hasFunctionDef) score += Math.floor(maxPoints * 0.2);
+    if (hasControlFlow || /\.split|re\./i.test(raw)) score += Math.floor(maxPoints * 0.3);
+    if (/interface|ip_address|vlan|status|shutdown/i.test(raw)) score += Math.floor(maxPoints * 0.3);
+    if (hasReturn) score += Math.floor(maxPoints * 0.2);
+    const finalScore = Math.min(score, maxPoints);
+    return {
+      score: finalScore,
+      maxPoints,
+      feedback: finalScore >= maxPoints * 0.6 ? "Switch configuration parser implemented." : "Incomplete parser logic.",
+      isPassed: finalScore >= maxPoints * 0.6,
+    };
+  }
+
   // DSA Algorithm questions (Two Sum, Palindrome, Merge Intervals, Trapping Rain Water, etc.)
   let dsaScore = 0;
   if (hasFunctionDef) dsaScore += Math.floor(maxPoints * 0.25);

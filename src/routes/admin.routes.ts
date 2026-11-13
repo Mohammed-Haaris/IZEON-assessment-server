@@ -3,6 +3,11 @@ import bcrypt from "bcrypt";
 import prisma from "../lib/prisma";
 import { authenticateToken, requireAdmin, AuthRequest } from "../middleware/auth.middleware";
 import { invalidateAssessmentCache } from "../lib/assessmentCache";
+import {
+  dataAnalystQuestions,
+  softwareDevQuestions,
+  networkEngineerQuestions,
+} from "../lib/questionBank";
 
 const router = Router();
 
@@ -322,6 +327,137 @@ router.patch("/questions/:id/points", async (req: AuthRequest, res: Response) =>
     res.json({ message: "Question points updated successfully", question: updated });
   } catch (error: any) {
     res.status(500).json({ message: "Failed to update points", error: error.message });
+  }
+});
+
+// 7.3 Standardize 70-mark distribution across Round 1 and Round 2
+router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const assessment = await prisma.assessment.findUnique({ where: { id } });
+    if (!assessment) {
+      res.status(404).json({ message: "Assessment not found" });
+      return;
+    }
+
+    // 1. Update assessment cutoffRound1 to 12
+    await prisma.assessment.update({
+      where: { id },
+      data: { cutoffRound1: 12 },
+    });
+
+    // 2. Set all Round 1 questions in this assessment to 1 pt
+    await prisma.question.updateMany({
+      where: { assessmentId: id, round: "ROUND_1_APTITUDE_VERBAL_WRITTEN" },
+      data: { points: 1 },
+    });
+
+    // 3. Set all Round 2 questions to 10 pts
+    await prisma.question.updateMany({
+      where: { assessmentId: id, round: "ROUND_2_CODING" },
+      data: { points: 10 },
+    });
+
+    // 4. Ensure Data Analyst has 3 Python and 2 SQL questions
+    for (const q of dataAnalystQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Data Analyst",
+            title: q.title,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: { points: 10, targetRole: "Data Analyst" },
+        });
+      }
+    }
+
+    // 5. Ensure Software Developer has 5 questions (10 pts each)
+    for (const q of softwareDevQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Software Developer",
+            title: q.title,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: { points: 10, targetRole: "Software Developer" },
+        });
+      }
+    }
+
+    // 6. Ensure Network Engineer has 5 questions (10 pts each)
+    for (const q of networkEngineerQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Network Engineer",
+            title: q.title,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+            options: (q as any).options || null,
+            correctAnswer: (q as any).correctAnswer || null,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "Network Engineer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+            options: (q as any).options || null,
+            correctAnswer: (q as any).correctAnswer || null,
+          },
+        });
+      }
+    }
+
+    invalidateAssessmentCache();
+
+    res.json({
+      message: "Successfully standardized 70-mark structure: Round 1 (20 pts, Cutoff: 12), Data Analyst (3 Python + 2 SQL = 50 pts), Software Dev (5x10 = 50 pts), Network Engineer (5x10 = 50 pts)!",
+    });
+  } catch (error: any) {
+    console.error("Standardize marks error:", error);
+    res.status(500).json({ message: "Failed to standardize marks", error: error.message });
   }
 });
 

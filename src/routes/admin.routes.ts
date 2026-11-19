@@ -19,10 +19,21 @@ router.use(requireAdmin);
 // 1. Get all students (optionally filter by status)
 router.get("/students", async (req: AuthRequest, res: Response) => {
   try {
-    const { status } = req.query;
+    const { status, startDate, endDate } = req.query;
     const where: any = { role: "STUDENT" };
     if (status && typeof status === "string") {
       where.status = status;
+    }
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate && typeof startDate === "string") {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate && typeof endDate === "string") {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
     }
 
     const students = await prisma.user.findMany({
@@ -489,11 +500,25 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
 // 8. Get all candidate attempts & proctoring status
 router.get("/attempts", async (req: AuthRequest, res: Response) => {
   try {
-    const { limit, offset } = req.query;
+    const { limit, offset, startDate, endDate } = req.query;
+    const where: any = {
+      user: { role: "STUDENT" },
+    };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate && typeof startDate === "string") {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate && typeof endDate === "string") {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
     const queryOptions: any = {
-      where: {
-        user: { role: "STUDENT" },
-      },
+      where,
       include: {
         user: {
           select: {

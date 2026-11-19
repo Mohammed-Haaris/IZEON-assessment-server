@@ -4,6 +4,7 @@ import prisma from "../lib/prisma";
 import { authenticateToken, requireAdmin, AuthRequest } from "../middleware/auth.middleware";
 import { invalidateAssessmentCache } from "../lib/assessmentCache";
 import {
+  allR1AptitudeQuestions,
   dataAnalystQuestions,
   softwareDevQuestions,
   networkEngineerQuestions,
@@ -213,6 +214,21 @@ router.post("/assessments/:id/questions", async (req: AuthRequest, res: Response
 
     if (!round || !category || !title || !content) {
       res.status(400).json({ message: "Round, category, title, and content are required" });
+      return;
+    }
+
+    // Check if question with the exact same title already exists in this assessment
+    const existingQ = await prisma.question.findFirst({
+      where: {
+        assessmentId: id,
+        title: title.trim(),
+      },
+    });
+
+    if (existingQ) {
+      res.status(400).json({
+        message: `A question titled "${title.trim()}" already exists in this assessment. Duplicates are not allowed.`,
+      });
       return;
     }
 

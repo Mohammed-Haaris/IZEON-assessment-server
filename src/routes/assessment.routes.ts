@@ -13,41 +13,54 @@ const router = Router();
 router.use(authenticateToken);
 router.use(requireApprovedStudent);
 
-// Helper to filter questions by candidate role in memory
+// Helper to filter questions by candidate role in memory and guarantee no duplicates
 function filterQuestionsForRole(questions: any[], studentRole?: string | null) {
-  if (!studentRole) return questions;
+  const roleFiltered = !studentRole
+    ? questions
+    : questions.filter((q) => {
+        if (studentRole === "Software Developer") {
+          const matchRole =
+            q.targetRole === "ALL" ||
+            q.targetRole === "Software Developer" ||
+            !q.targetRole;
+          return matchRole && q.category !== "SQL";
+        }
 
-  return questions.filter((q) => {
-    if (studentRole === "Software Developer") {
-      const matchRole =
-        q.targetRole === "ALL" ||
-        q.targetRole === "Software Developer" ||
-        !q.targetRole;
-      return matchRole && q.category !== "SQL";
+        if (studentRole === "Data Analyst") {
+          return (
+            q.targetRole === "ALL" ||
+            q.targetRole === "Data Analyst" ||
+            !q.targetRole
+          );
+        }
+
+        if (studentRole === "Network Engineer") {
+          return (
+            q.targetRole === "ALL" ||
+            q.targetRole === "Network Engineer" ||
+            !q.targetRole
+          );
+        }
+
+        return (
+          q.targetRole === "ALL" ||
+          q.targetRole === studentRole ||
+          !q.targetRole
+        );
+      });
+
+  // Deduplicate questions by round and title so candidate never encounters duplicate questions
+  const seen = new Set<string>();
+  const uniqueQuestions: any[] = [];
+  for (const q of roleFiltered) {
+    const key = `${q.round}_${q.title?.trim().toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueQuestions.push(q);
     }
+  }
 
-    if (studentRole === "Data Analyst") {
-      return (
-        q.targetRole === "ALL" ||
-        q.targetRole === "Data Analyst" ||
-        !q.targetRole
-      );
-    }
-
-    if (studentRole === "Network Engineer") {
-      return (
-        q.targetRole === "ALL" ||
-        q.targetRole === "Network Engineer" ||
-        !q.targetRole
-      );
-    }
-
-    return (
-      q.targetRole === "ALL" ||
-      q.targetRole === studentRole ||
-      !q.targetRole
-    );
-  });
+  return uniqueQuestions;
 }
 
 // 1. Get active assessment for the student (High performance cached read)
@@ -435,6 +448,17 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
           })
       : [];
 
+    // Guarantee no duplicates in coding questions
+    const uniqueCodingQuestions: any[] = [];
+    const seenCodingTitles = new Set<string>();
+    for (const q of codingQuestions) {
+      const key = q.title?.trim().toLowerCase();
+      if (!seenCodingTitles.has(key)) {
+        seenCodingTitles.add(key);
+        uniqueCodingQuestions.push(q);
+      }
+    }
+
     res.json({
       success: true,
       isQualified,
@@ -444,7 +468,7 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
         ? "Congratulations! You have qualified for Round 2 (Coding & Technical Assessment)."
         : `Assessment Completed. Your Round 1 score is ${round1Score} pts (Cutoff: ${cutoffRound1} pts). You have not qualified for Round 2.`,
       attempt: updatedAttempt,
-      codingQuestions,
+      codingQuestions: uniqueCodingQuestions,
       durationR2: attempt.assessment.durationR2,
     });
   } catch (error: any) {

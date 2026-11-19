@@ -58,7 +58,32 @@ export async function seedDefaultData() {
       });
     }
 
-    // 3. Synchronize All 20 Round 1 Aptitude & Reasoning Questions (1 Point Each = 20 Marks)
+    // 2.1 Deduplicate any questions that may have duplicate titles in activeAssessment
+    const allExistingQuestions = await prisma.question.findMany({
+      where: { assessmentId: activeAssessment.id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const seenQuestions = new Map<string, string>();
+    const duplicateIdsToDelete: string[] = [];
+
+    for (const q of allExistingQuestions) {
+      const key = `${q.round}_${(q.targetRole || "ALL").trim().toLowerCase()}_${q.title.trim().toLowerCase()}`;
+      if (seenQuestions.has(key)) {
+        duplicateIdsToDelete.push(q.id);
+      } else {
+        seenQuestions.set(key, q.id);
+      }
+    }
+
+    if (duplicateIdsToDelete.length > 0) {
+      await prisma.question.deleteMany({
+        where: { id: { in: duplicateIdsToDelete } },
+      });
+      console.log(`🧹 Deleted ${duplicateIdsToDelete.length} duplicate questions from active assessment.`);
+    }
+
+    // 3. Synchronize All 20 Round 1 Aptitude & Reasoning Questions (1 Point Each = 20 Marks, Shuffled Options)
     for (const q of allR1AptitudeQuestions) {
       const existing = await prisma.question.findFirst({
         where: { assessmentId: activeAssessment.id, title: q.title },
@@ -80,7 +105,14 @@ export async function seedDefaultData() {
       } else {
         await prisma.question.update({
           where: { id: existing.id },
-          data: { points: 1 },
+          data: {
+            points: 1,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            content: q.content,
+            category: q.category as any,
+            targetRole: q.targetRole,
+          },
         });
       }
     }
@@ -107,7 +139,14 @@ export async function seedDefaultData() {
       } else {
         await prisma.question.update({
           where: { id: existing.id },
-          data: { points: 10, targetRole: "Software Developer" },
+          data: {
+            points: 10,
+            targetRole: "Software Developer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+          },
         });
       }
     }
@@ -134,7 +173,14 @@ export async function seedDefaultData() {
       } else {
         await prisma.question.update({
           where: { id: existing.id },
-          data: { points: 10, targetRole: "Data Analyst" },
+          data: {
+            points: 10,
+            targetRole: "Data Analyst",
+            category: q.category as any,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+          },
         });
       }
     }

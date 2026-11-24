@@ -428,6 +428,15 @@ router.post("/submit-round1", async (req: AuthRequest, res: Response) => {
                 q.category !== "SQL"
               );
             }
+            if (studentRole === "Cloud Engineer") {
+              return q.targetRole === "Cloud Engineer" || q.targetRole === "ALL";
+            }
+            if (studentRole === "AI Engineer") {
+              return q.targetRole === "AI Engineer" || q.targetRole === "ALL";
+            }
+            if (studentRole === "Digital Marketing") {
+              return q.targetRole === "Digital Marketing" || q.targetRole === "ALL";
+            }
             return true;
           })
           .map((q: any) => {

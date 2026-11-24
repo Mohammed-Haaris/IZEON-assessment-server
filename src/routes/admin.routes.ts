@@ -8,6 +8,9 @@ import {
   dataAnalystQuestions,
   softwareDevQuestions,
   networkEngineerQuestions,
+  cloudEngineerQuestions,
+  aiEngineerQuestions,
+  digitalMarketingQuestions,
 } from "../lib/questionBank";
 
 const router = Router();
@@ -538,10 +541,112 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
       }
     }
 
+    // Ensure Cloud Engineer has 5 questions (10 pts each)
+    for (const q of cloudEngineerQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Cloud Engineer",
+            title: q.title,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "Cloud Engineer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+          },
+        });
+      }
+    }
+
+    // Ensure AI Engineer has 5 questions (10 pts each)
+    for (const q of aiEngineerQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "AI Engineer",
+            title: q.title,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "AI Engineer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+          },
+        });
+      }
+    }
+
+    // Ensure Digital Marketing has 5 questions (10 pts each)
+    for (const q of digitalMarketingQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: id, title: q.title },
+      });
+      if (!existing) {
+        await (prisma.question as any).create({
+          data: {
+            assessmentId: id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Digital Marketing",
+            title: q.title,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+            points: 10,
+          } as any,
+        });
+      } else {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "Digital Marketing",
+            category: q.category as any,
+            content: q.content,
+            starterCode: (q as any).starterCode || null,
+            testCases: (q as any).testCases || null,
+          },
+        });
+      }
+    }
+
     invalidateAssessmentCache();
 
     res.json({
-      message: "Successfully standardized 70-mark structure: Round 1 (20 pts, Cutoff: 12), Data Analyst (3 Python + 2 SQL = 50 pts), Software Dev (5x10 = 50 pts), Network Engineer (5x10 = 50 pts)!",
+      message: "Successfully standardized 70-mark structure across all tracks (Dev, Analyst, Network, Cloud, AI, Marketing)!",
     });
   } catch (error: any) {
     console.error("Standardize marks error:", error);

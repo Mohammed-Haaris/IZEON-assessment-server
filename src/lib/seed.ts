@@ -5,6 +5,9 @@ import {
   softwareDevQuestions,
   dataAnalystQuestions,
   networkEngineerQuestions,
+  cloudEngineerQuestions,
+  aiEngineerQuestions,
+  digitalMarketingQuestions,
 } from "./questionBank";
 
 export async function seedDefaultData() {
@@ -285,6 +288,108 @@ export async function seedDefaultData() {
       }
     }
 
+    // Synchronize Cloud Engineer Questions (5 Questions, 10 Marks Each = 50 Marks)
+    for (const q of cloudEngineerQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: activeAssessment.id, title: q.title },
+      });
+      if (!existing) {
+        await prisma.question.create({
+          data: {
+            assessmentId: activeAssessment.id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Cloud Engineer",
+            title: q.title,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+            points: 10,
+          },
+        });
+      } else if (existing.points !== 10 || existing.targetRole !== "Cloud Engineer") {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "Cloud Engineer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+          },
+        });
+      }
+    }
+
+    // Synchronize AI Engineer Questions (5 Questions, 10 Marks Each = 50 Marks)
+    for (const q of aiEngineerQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: activeAssessment.id, title: q.title },
+      });
+      if (!existing) {
+        await prisma.question.create({
+          data: {
+            assessmentId: activeAssessment.id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "AI Engineer",
+            title: q.title,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+            points: 10,
+          },
+        });
+      } else if (existing.points !== 10 || existing.targetRole !== "AI Engineer") {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "AI Engineer",
+            category: q.category as any,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+          },
+        });
+      }
+    }
+
+    // Synchronize Digital Marketing Questions (5 Questions, 10 Marks Each = 50 Marks)
+    for (const q of digitalMarketingQuestions) {
+      const existing = await prisma.question.findFirst({
+        where: { assessmentId: activeAssessment.id, title: q.title },
+      });
+      if (!existing) {
+        await prisma.question.create({
+          data: {
+            assessmentId: activeAssessment.id,
+            round: "ROUND_2_CODING",
+            category: q.category as any,
+            targetRole: "Digital Marketing",
+            title: q.title,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+            points: 10,
+          },
+        });
+      } else if (existing.points !== 10 || existing.targetRole !== "Digital Marketing") {
+        await prisma.question.update({
+          where: { id: existing.id },
+          data: {
+            points: 10,
+            targetRole: "Digital Marketing",
+            category: q.category as any,
+            content: q.content,
+            starterCode: q.starterCode,
+            testCases: q.testCases,
+          },
+        });
+      }
+    }
+
     // 7. Ensure All Round 2 Questions have targetRole correctly tagged
     await (prisma.question as any).updateMany({
       where: {
@@ -297,7 +402,7 @@ export async function seedDefaultData() {
       } as any,
     });
 
-    console.log("✅ Seed complete: 70 Marks total (R1: 20 pts, Cutoff: 12. R2: 50 pts per track [Dev: 5x10, Analyst: 3 Python + 2 SQL, Network: 5x10]).");
+    console.log("✅ Seed complete: 70 Marks total (R1: 20 pts, Cutoff: 12. R2: 50 pts per track [Dev, Analyst, Network, Cloud, AI, Marketing]).");
   } catch (error) {
     console.error("Seeding error:", error);
   }

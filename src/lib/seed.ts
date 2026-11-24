@@ -100,12 +100,12 @@ export async function seedDefaultData() {
       });
     } else {
       // Update assessment cutoffRound1 and cutoffRound2 if needed
-      if ((activeAssessment as any).cutoffRound1 !== 12 || (activeAssessment as any).cutoffRound2 === undefined || (activeAssessment as any).cutoffRound2 === null) {
+      if (activeAssessment.cutoffRound1 !== 12 || activeAssessment.cutoffRound2 === undefined || activeAssessment.cutoffRound2 === null) {
         await prisma.assessment.update({
           where: { id: activeAssessment.id },
           data: {
             cutoffRound1: 12,
-            cutoffRound2: (activeAssessment as any).cutoffRound2 ?? 30,
+            cutoffRound2: activeAssessment.cutoffRound2 ?? 30,
           },
         });
       }

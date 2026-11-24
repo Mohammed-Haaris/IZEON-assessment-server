@@ -421,7 +421,7 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
       where: { id },
       data: {
         cutoffRound1: 12,
-        cutoffRound2: (assessment as any).cutoffRound2 ?? 30,
+        cutoffRound2: assessment.cutoffRound2 ?? 30,
       },
     });
 
@@ -529,7 +529,7 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
             targetRole: "Network Engineer",
             category: q.category as any,
             content: q.content,
-            starterCode: (q as any).sarterCode || null,
+            starterCode: (q as any).starterCode || null,
             testCases: (q as any).testCases || null,
             options: (q as any).options || null,
             correctAnswer: (q as any).correctAnswer || null,

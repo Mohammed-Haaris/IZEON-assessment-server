@@ -9,6 +9,25 @@ const JWT_SECRET = process.env.JWT_SECRET || "izeon_super_secret_jwt_key_2026";
 
 const inFlightRegistrations = new Set<string>();
 
+// Get list of active colleges for candidate registration dropdown
+router.get("/colleges", async (_req, res: Response) => {
+  try {
+    const colleges = await prisma.college.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+    });
+    res.json({ colleges });
+  } catch (error: any) {
+    console.error("Fetch colleges error:", error);
+    res.status(500).json({ message: "Failed to fetch colleges", error: error.message });
+  }
+});
+
 // Register
 router.post("/register", async (req, res: Response) => {
   try {
@@ -82,6 +101,7 @@ router.post("/register", async (req, res: Response) => {
         cgpa: true,
         role: true,
         status: true,
+        allowWithoutCamera: true,
         createdAt: true,
       },
     });
@@ -161,6 +181,7 @@ router.post("/login", async (req, res: Response) => {
         college: user.college,
         role: user.role,
         status: user.status,
+        allowWithoutCamera: (user as any).allowWithoutCamera || false,
       },
     });
   } catch (error: any) {
@@ -189,6 +210,7 @@ router.get("/me", authenticateToken, async (req: AuthRequest, res: Response) => 
         cgpa: true,
         role: true,
         status: true,
+        allowWithoutCamera: true,
         createdAt: true,
       },
     });

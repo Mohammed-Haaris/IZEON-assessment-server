@@ -33,6 +33,55 @@ export async function seedDefaultData() {
       data: { status: "APPROVED" },
     });
 
+    // 1.1 Ensure default Colleges exist & import student colleges
+    const defaultColleges = [
+      { name: "PSNA College of Engineering and Technology", code: "PSNA" },
+      { name: "National Engineering College", code: "NEC" },
+      { name: "Anna University, Chennai", code: "AU" },
+      { name: "PSG College of Technology, Coimbatore", code: "PSG TECH" },
+      { name: "Thiagarajar College of Engineering, Madurai", code: "TCE" },
+      { name: "Coimbatore Institute of Technology", code: "CIT" },
+      { name: "Kumaraguru College of Technology", code: "KCT" },
+      { name: "Sri Sivasubramaniya Nadar College of Engineering", code: "SSN" },
+      { name: "Government College of Technology, Coimbatore", code: "GCT" },
+      { name: "Kongu Engineering College", code: "KEC" },
+      { name: "Mepco Schlenk Engineering College", code: "MEPCO" },
+      { name: "Velammal College of Engineering and Technology", code: "VCET" },
+    ];
+
+    for (const col of defaultColleges) {
+      await prisma.college.upsert({
+        where: { name: col.name },
+        update: {},
+        create: {
+          name: col.name,
+          code: col.code,
+          isActive: true,
+        },
+      });
+    }
+
+    // Automatically import distinct colleges from existing registered candidates
+    const existingColleges = await prisma.user.findMany({
+      where: { college: { not: null } },
+      select: { college: true },
+      distinct: ["college"],
+    });
+
+    for (const item of existingColleges) {
+      if (item.college && item.college.trim()) {
+        const trimmed = item.college.trim();
+        await prisma.college.upsert({
+          where: { name: trimmed },
+          update: {},
+          create: {
+            name: trimmed,
+            isActive: true,
+          },
+        }).catch(() => {});
+      }
+    }
+
     // 2. Ensure Sample Assessment exists with 70 Marks (20 R1 + 50 R2, Cutoff: 12)
     let activeAssessment = await prisma.assessment.findFirst({ where: { isActive: true } });
     if (!activeAssessment) {
@@ -170,7 +219,7 @@ export async function seedDefaultData() {
             points: 10,
           } as any,
         });
-      } else {
+      } else if (existing.points !== 10 || (existing as any).targetRole !== "Data Analyst") {
         await prisma.question.update({
           where: { id: existing.id },
           data: {
@@ -215,7 +264,7 @@ export async function seedDefaultData() {
             points: 10,
           } as any,
         });
-      } else {
+      } else if (existing.points !== 10 || (existing as any).targetRole !== "Network Engineer") {
         await prisma.question.update({
           where: { id: existing.id },
           data: {

@@ -52,6 +52,7 @@ router.get("/students", async (req: AuthRequest, res: Response) => {
         twelfthMark: true,
         cgpa: true,
         status: true,
+        allowWithoutCamera: true,
         createdAt: true,
         _count: {
           select: { attempts: true },
@@ -97,6 +98,38 @@ router.patch("/students/:id/status", async (req: AuthRequest, res: Response) => 
   } catch (error: any) {
     console.error("Update student status error:", error);
     res.status(500).json({ message: "Failed to update status", error: error.message });
+  }
+});
+
+// 2b. Toggle camera exemption for a student
+router.patch("/students/:id/camera-exemption", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { allowWithoutCamera } = req.body;
+
+    if (typeof allowWithoutCamera !== "boolean") {
+      res.status(400).json({ message: "allowWithoutCamera must be a boolean" });
+      return;
+    }
+
+    const updatedStudent = await prisma.user.update({
+      where: { id },
+      data: { allowWithoutCamera },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        allowWithoutCamera: true,
+      },
+    });
+
+    res.json({
+      message: `Camera exemption ${allowWithoutCamera ? "granted" : "revoked"} for ${updatedStudent.name}`,
+      student: updatedStudent,
+    });
+  } catch (error: any) {
+    console.error("Camera exemption error:", error);
+    res.status(500).json({ message: "Failed to update camera exemption", error: error.message });
   }
 });
 
@@ -534,6 +567,7 @@ router.get("/attempts", async (req: AuthRequest, res: Response) => {
             tenthMark: true,
             twelfthMark: true,
             cgpa: true,
+            allowWithoutCamera: true,
           },
         },
         assessment: {
@@ -1055,6 +1089,113 @@ router.get("/export-students", async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Export students error:", error);
     res.status(500).json({ message: "Failed to export student records", error: error.message });
+  }
+});
+
+// 17. College Management Endpoints
+// 17.1 List all colleges with student count
+router.get("/colleges", async (_req: AuthRequest, res: Response) => {
+  try {
+    const colleges = await prisma.college.findMany({
+      orderBy: { name: "asc" },
+    });
+
+    const studentCounts = await prisma.user.groupBy({
+      by: ["college"],
+      where: { role: "STUDENT" },
+      _count: { id: true },
+    });
+
+    const countMap = new Map<string, number>();
+    for (const item of studentCounts) {
+      if (item.college) {
+        countMap.set(item.college.trim().toLowerCase(), item._count.id);
+      }
+    }
+
+    const collegesWithCount = colleges.map((c) => ({
+      ...c,
+      studentCount: countMap.get(c.name.trim().toLowerCase()) || 0,
+    }));
+
+    res.json({ colleges: collegesWithCount });
+  } catch (error: any) {
+    console.error("Fetch colleges error:", error);
+    res.status(500).json({ message: "Failed to fetch colleges", error: error.message });
+  }
+});
+
+// 17.2 Create a new college
+router.post("/colleges", async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, code } = req.body;
+    if (!name || typeof name !== "string" || !name.trim()) {
+      res.status(400).json({ message: "College name is required" });
+      return;
+    }
+
+    const trimmedName = name.trim();
+    const existing = await prisma.college.findUnique({
+      where: { name: trimmedName },
+    });
+
+    if (existing) {
+      res.status(409).json({ message: `College "${trimmedName}" already exists` });
+      return;
+    }
+
+    const college = await prisma.college.create({
+      data: {
+        name: trimmedName,
+        code: code && typeof code === "string" ? code.trim().toUpperCase() : null,
+        isActive: true,
+      },
+    });
+
+    res.status(201).json({ message: "College added successfully", college });
+  } catch (error: any) {
+    console.error("Add college error:", error);
+    res.status(500).json({ message: "Failed to add college", error: error.message });
+  }
+});
+
+// 17.3 Update a college
+router.put("/colleges/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, code, isActive } = req.body;
+
+    const existing = await prisma.college.findUnique({ where: { id: id as string } });
+    if (!existing) {
+      res.status(404).json({ message: "College not found" });
+      return;
+    }
+
+    const updated = await prisma.college.update({
+      where: { id: id as string },
+      data: {
+        ...(name !== undefined && typeof name === "string" ? { name: name.trim() } : {}),
+        ...(code !== undefined ? { code: code && typeof code === "string" ? code.trim().toUpperCase() : null } : {}),
+        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+      },
+    });
+
+    res.json({ message: "College updated successfully", college: updated });
+  } catch (error: any) {
+    console.error("Update college error:", error);
+    res.status(500).json({ message: "Failed to update college", error: error.message });
+  }
+});
+
+// 17.4 Delete a college
+router.delete("/colleges/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.college.delete({ where: { id: id as string } });
+    res.json({ message: "College deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete college error:", error);
+    res.status(500).json({ message: "Failed to delete college", error: error.message });
   }
 });
 

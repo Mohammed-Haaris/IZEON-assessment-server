@@ -62,6 +62,7 @@ model User {
   cgpa            String?
   role            Role               @default(STUDENT)
   status          StudentStatus      @default(APPROVED)
+  allowWithoutCamera Boolean            @default(false)
   resetToken      String?
   resetTokenExpiry DateTime?
   createdAt       DateTime           @default(now())
@@ -70,6 +71,18 @@ model User {
   malpracticeLogs MalpracticeLog[]
 
   @@index([role, status])
+}
+
+model College {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
 }
 
 model Assessment {

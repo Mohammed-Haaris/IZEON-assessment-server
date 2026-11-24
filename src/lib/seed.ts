@@ -356,38 +356,28 @@ export async function seedDefaultData() {
       }
     }
 
-    // Synchronize Digital Marketing Questions (5 Questions, 10 Marks Each = 50 Marks)
+    // Synchronize Digital Marketing Questions (5 Theoretical & Strategy Case Studies, 10 Marks Each = 50 Marks)
+    await prisma.question.deleteMany({
+      where: {
+        assessmentId: activeAssessment.id,
+        category: "DIGITAL_MARKETING" as any,
+      },
+    });
+
     for (const q of digitalMarketingQuestions) {
-      const existing = await prisma.question.findFirst({
-        where: { assessmentId: activeAssessment.id, title: q.title },
+      await prisma.question.create({
+        data: {
+          assessmentId: activeAssessment.id,
+          round: "ROUND_2_CODING",
+          category: q.category as any,
+          targetRole: "Digital Marketing",
+          title: q.title,
+          content: q.content,
+          starterCode: q.starterCode,
+          testCases: q.testCases as any,
+          points: 10,
+        },
       });
-      if (!existing) {
-        await prisma.question.create({
-          data: {
-            assessmentId: activeAssessment.id,
-            round: "ROUND_2_CODING",
-            category: q.category as any,
-            targetRole: "Digital Marketing",
-            title: q.title,
-            content: q.content,
-            starterCode: q.starterCode,
-            testCases: q.testCases,
-            points: 10,
-          },
-        });
-      } else if (existing.points !== 10 || existing.targetRole !== "Digital Marketing") {
-        await prisma.question.update({
-          where: { id: existing.id },
-          data: {
-            points: 10,
-            targetRole: "Digital Marketing",
-            category: q.category as any,
-            content: q.content,
-            starterCode: q.starterCode,
-            testCases: q.testCases,
-          },
-        });
-      }
     }
 
     // 7. Ensure All Round 2 Questions have targetRole correctly tagged

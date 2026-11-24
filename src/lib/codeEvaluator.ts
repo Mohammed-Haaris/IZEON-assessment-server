@@ -41,6 +41,64 @@ export function evaluateCodingAnswer(code: any, question: any): EvaluationResult
     }
   }
 
+  const categoryUpper = (question.category || "").toUpperCase();
+  const titleLower = (question.title || "").toLowerCase();
+
+  // 2.5 Theoretical Marketing Strategy Evaluation (Case studies evaluated on analytical depth & frameworks)
+  if (categoryUpper === "DIGITAL_MARKETING" || question.targetRole === "Digital Marketing") {
+    const words = raw.trim().split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
+
+    const marketingKeywords = [
+      "roas", "cac", "ctr", "cpc", "cpl", "ltv", "funnel", "tofu", "mofu", "bofu",
+      "conversion", "retention", "bounce", "seo", "backlink", "meta", "google",
+      "budget", "audience", "campaign", "segmentation", "rfm", "attribution", "kpi",
+      "analytics", "ga4", "churn", "test", "content", "organic", "strategy", "revenue",
+      "target", "email", "sms", "whatsapp", "creative", "engagement", "customer", "cohort",
+      "metric", "checkout", "cart", "cro", "reallocation", "traffic", "impression"
+    ];
+
+    const lowerRaw = raw.toLowerCase();
+    const matchedKeywords = marketingKeywords.filter((kw) => lowerRaw.includes(kw));
+
+    if (wordCount < 15) {
+      return {
+        score: 0,
+        maxPoints,
+        feedback: "Response is too brief. Please provide a detailed theoretical and strategic case study analysis.",
+        isPassed: false,
+      };
+    }
+
+    let earned = 0;
+    if (wordCount >= 80) {
+      earned += Math.floor(maxPoints * 0.5);
+    } else if (wordCount >= 40) {
+      earned += Math.floor(maxPoints * 0.35);
+    } else {
+      earned += Math.floor(maxPoints * 0.2);
+    }
+
+    if (matchedKeywords.length >= 6) {
+      earned += Math.floor(maxPoints * 0.5);
+    } else if (matchedKeywords.length >= 3) {
+      earned += Math.floor(maxPoints * 0.35);
+    } else {
+      earned += Math.floor(maxPoints * 0.15);
+    }
+
+    const finalScore = Math.min(earned, maxPoints);
+    return {
+      score: finalScore,
+      maxPoints,
+      feedback:
+        finalScore >= maxPoints * 0.6
+          ? `Comprehensive marketing strategy submitted (${wordCount} words, covered ${matchedKeywords.length} core marketing concepts).`
+          : `Partial marketing analysis (${wordCount} words). Add more tactical depth and quantitative frameworks.`,
+      isPassed: finalScore >= maxPoints * 0.6,
+    };
+  }
+
   // 3. Strip all comments and trivial boilerplate
   const stripped = raw
     .replace(/--[^\n]*/g, "") // SQL line comments
@@ -74,9 +132,6 @@ export function evaluateCodingAnswer(code: any, question: any): EvaluationResult
       isPassed: isCorrect,
     };
   }
-
-  const titleLower = (question.title || "").toLowerCase();
-  const categoryUpper = (question.category || "").toUpperCase();
 
   // 5. SQL Domain Evaluation
   if (categoryUpper === "SQL" || titleLower.includes("sql") || titleLower.includes("query")) {

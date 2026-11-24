@@ -729,117 +729,67 @@ export const aiEngineerQuestions = [
 ];
 
 // ==========================================
-// 6. Digital Marketing Track: 5 Questions, 10 Marks Each = 50 Marks
+// 6. Digital Marketing Track: 5 Theoretical & Strategy Case Studies, 10 Marks Each = 50 Marks
 // ==========================================
 export const digitalMarketingQuestions = [
   {
     round: "ROUND_2_CODING",
     category: "DIGITAL_MARKETING",
     targetRole: "Digital Marketing",
-    title: "Performance Marketing: Campaign Unit Economics & ROAS Calculator",
-    content: "Digital marketers analyze campaign data to calculate key metrics and determine whether ad spend is profitable.\n\nWrite a Python function `calculate_marketing_roi(spend, impressions, clicks, conversions, revenue)` that computes:\n1. `CTR`: Click-Through Rate $(\\text{Clicks} / \\text{Impressions}) \\times 100$ %\n2. `CPC`: Cost Per Click $(\\text{Spend} / \\text{Clicks})$\n3. `Conversion_Rate`: $(\\text{Conversions} / \\text{Clicks}) \\times 100$ %\n4. `CAC`: Customer Acquisition Cost $(\\text{Spend} / \\text{Conversions})$\n5. `ROAS`: Return on Ad Spend $(\\text{Revenue} / \\text{Spend})$\n6. `Verdict`: `'SCALE'` if $ROAS \\ge 3.0$, `'OPTIMIZE'` if $2.0 \\le ROAS < 3.0$, else `'PAUSE'`\n\nRound all floating numbers to 2 decimal places. Return a dict matching these exact keys.",
+    title: "Performance Marketing: Full-Funnel Paid Ads & ROAS Turnaround Strategy",
+    content: "You are the Lead Growth Marketer for a direct-to-consumer (D2C) apparel brand. The company currently spends ₹5,00,000 per month across Meta (Facebook & Instagram) and Google Ads, but Return on Ad Spend (ROAS) has dropped to 1.4x (Break-even ROAS is 2.2x), and Customer Acquisition Cost (CAC) has increased by 65% over the past 60 days.\n\n### Key Case Study Objectives:\n1. Root Cause Analysis: Identify the 3 core bottlenecks causing ad fatigue, high CAC, and low ROAS.\n2. Budget & Channel Allocation: Reallocate the ₹5,00,000 budget across TOFU (Awareness), MOFU (Consideration), and BOFU (Retargeting) with clear justification.\n3. Creative & Audience Testing: Outline your high-converting creative testing framework (hooks, UGC, carousels) and targeting segmentation.\n4. 30-Day Turnaround Milestones: Detail weekly execution steps to scale blended ROAS back to 3.0x+.",
     starterCode: {
-      python: "def calculate_marketing_roi(spend, impressions, clicks, conversions, revenue):\n    # Return dict with CTR, CPC, Conversion_Rate, CAC, ROAS, Verdict\n    pass\n",
+      text: "### 1. Root Cause Diagnosis & Bottleneck Analysis:\n[Analyze ad fatigue, audience saturation, tracking discrepancies, and rising CPMs]\n\n### 2. Full-Funnel Budget & Channel Reallocation (₹5,00,000 Total):\n- TOFU (Top of Funnel - Awareness & Reach): ₹[Amount] (e.g. Meta Reels & Broad targeting)\n- MOFU (Middle of Funnel - Consideration): ₹[Amount] (e.g. Google Search & Video Engagement)\n- BOFU (Bottom of Funnel - Conversion & Retargeting): ₹[Amount] (e.g. Catalog Ads & High-Intent Search)\n- Expected Blended ROAS Target: [e.g. 3.2x]\n\n### 3. Creative Testing & Audience Segmentation Framework:\n- Ad Formats & Hooks (UGC, Problem-Solution, Founder Story):\n- Audience Targeting (Broad, 1%-3% Lookalikes, 30-Day Purchasers Exclusion):\n\n### 4. 30-Day Tactical Turnaround Roadmap:\n- Week 1: Audit, pixel verification, creative refresh\n- Week 2: Campaign restructuring and bid strategy testing\n- Week 3: Scaling winners and killing underperforming ad sets\n- Week 4: Retargeting optimization and blended unit economics review\n",
     },
-    testCases: [
-      {
-        input: "spend=50000, impressions=200000, clicks=4000, conversions=200, revenue=200000",
-        output: "{'CTR': 2.0, 'CPC': 12.5, 'Conversion_Rate': 5.0, 'CAC': 250.0, 'ROAS': 4.0, 'Verdict': 'SCALE'}",
-        isHidden: false,
-      },
-      {
-        input: "spend=30000, impressions=100000, clicks=1500, conversions=50, revenue=45000",
-        output: "{'CTR': 1.5, 'CPC': 20.0, 'Conversion_Rate': 3.33, 'CAC': 600.0, 'ROAS': 1.5, 'Verdict': 'PAUSE'}",
-        isHidden: false,
-      },
-    ],
+    testCases: null,
     points: 10,
   },
   {
     round: "ROUND_2_CODING",
     category: "DIGITAL_MARKETING",
     targetRole: "Digital Marketing",
-    title: "Technical SEO: Meta Tags & OpenGraph Audit Parser",
-    content: "SEO specialists crawl page HTML headers to verify meta titles, descriptions, canonical links, and viewport responsiveness.\n\nWrite a Python function `audit_seo_metadata(meta_tags)` where `meta_tags` is a dictionary of extracted HTML tags:\n`meta_tags = {'title': 'Best Running Shoes | SportsStore', 'description': 'Shop top quality running shoes with free shipping...', 'canonical': 'https://sports.com/shoes', 'viewport': 'width=device-width, initial-scale=1'}`\n\nAudit rules:\n- `title_valid`: `True` if title length is between 30 and 60 characters, else `False`.\n- `description_valid`: `True` if description length is between 70 and 160 characters, else `False`.\n- `has_canonical`: `True` if canonical URL starts with `'https://'`, else `False`.\n- `mobile_ready`: `True` if `'viewport'` exists and contains `'width=device-width'`, else `False`.\n- `seo_health_score`: Integer percentage $(passed\\_checks / 4) \\times 100$.\n\nReturn dictionary with these 5 keys.",
+    title: "Technical & On-Page SEO: B2B Organic Traffic & Trial Conversion Strategy",
+    content: "A B2B SaaS company currently attracts 15,000 monthly organic visitors from 60 blog articles. However, 85% of traffic is high-bounce, informational readers who never sign up for product trials. Their high-intent transactional commercial landing pages rank on page 3 or 4 of Google.\n\n### Key Case Study Objectives:\n1. Technical SEO Audit: Detail 4 critical technical fixes (Core Web Vitals, crawl depth, canonicalization, mobile responsiveness) needed to improve indexing.\n2. Topic Clusters & Search Intent Mapping: Structure a Pillar-Cluster content architecture mapping informational, navigational, and commercial transactional keywords.\n3. On-Page Optimization & Trial CRO: Outline on-page optimizations (internal linking anchors, CTA placement, schema markup, featured snippets) to convert organic visitors into product trials.\n4. High-Authority Backlink Acquisition: Propose a white-hat digital PR and high-domain authority (DA 60+) backlink acquisition plan.",
     starterCode: {
-      python: "def audit_seo_metadata(meta_tags):\n    # Return {'title_valid': bool, 'description_valid': bool, 'has_canonical': bool, 'mobile_ready': bool, 'seo_health_score': int}\n    pass\n",
+      text: "### 1. Technical SEO Audit & Core Web Vitals Fixes:\n- Crawlability & Indexing (XML Sitemaps, robots.txt, canonical tags):\n- Page Experience (LCP, INP, CLS optimization, mobile responsiveness):\n\n### 2. Topic Clusters & Search Intent Architecture:\n- Pillar Page Topic:\n- Supporting Cluster Sub-topics (Informational vs Commercial Intent):\n- Keyword Targeting & Search Volume Prioritization:\n\n### 3. On-Page Optimization & Trial Conversion CRO:\n- Meta Title & Description CTR optimization:\n- Internal Linking Strategy (passing PageRank from high-traffic blogs to product landing pages):\n- Lead Capture CTAs & Interactive Lead Magnets:\n\n### 4. High-Authority Backlink & Digital PR Outreach:\n- Guest contribution angles & industry study data distribution:\n- SaaS directory listings and comparison page link building:\n- Target KPIs (Domain Rating target, organic traffic growth, free trial conversion rate):\n",
     },
-    testCases: [
-      {
-        input: "meta_tags={'title': 'Best Running Shoes for Men & Women', 'description': 'Discover our premium range of lightweight running shoes with free express delivery on all orders.', 'canonical': 'https://sports.com/shoes', 'viewport': 'width=device-width, initial-scale=1'}",
-        output: "{'title_valid': True, 'description_valid': True, 'has_canonical': True, 'mobile_ready': True, 'seo_health_score': 100}",
-        isHidden: false,
-      },
-      {
-        input: "meta_tags={'title': 'Shoes', 'description': 'Short text', 'canonical': 'http://insecure.com', 'viewport': None}",
-        output: "{'title_valid': False, 'description_valid': False, 'has_canonical': False, 'mobile_ready': False, 'seo_health_score': 0}",
-        isHidden: false,
-      },
-    ],
+    testCases: null,
     points: 10,
   },
   {
     round: "ROUND_2_CODING",
     category: "DIGITAL_MARKETING",
     targetRole: "Digital Marketing",
-    title: "Campaign Budget Allocation: Full-Funnel Paid Ads Optimizer",
-    content: "When launching paid ad campaigns across Google & Meta, growth marketers divide budgets across the sales funnel:\n- **TOFU (Top of Funnel - Brand Awareness)**\n- **MOFU (Middle of Funnel - Consideration & Lead Gen)**\n- **BOFU (Bottom of Funnel - Retargeting & Direct Purchase)**\n\nWrite a Python function `allocate_funnel_budget(total_budget, campaign_goal)` that allocates budget based on `campaign_goal`:\n- If `'BRAND_AWARENESS'`: TOFU 60%, MOFU 30%, BOFU 10%\n- If `'LEAD_GENERATION'`: TOFU 30%, MOFU 50%, BOFU 20%\n- If `'DIRECT_PURCHASE'`: TOFU 20%, MOFU 30%, BOFU 50%\n\nReturn a dictionary:\n`{'tofu_budget': float, 'mofu_budget': float, 'bofu_budget': float, 'primary_kpi': str}`\n\nWhere `primary_kpi` is:\n- `'Impressions & Reach'` for `'BRAND_AWARENESS'`\n- `'Cost Per Lead (CPL)'` for `'LEAD_GENERATION'`\n- `'ROAS & Cost Per Acquisition (CPA)'` for `'DIRECT_PURCHASE'`\n\nRound all budget amounts to 2 decimal places.",
+    title: "Conversion Rate Optimization (CRO) & E-Commerce Cart Abandonment",
+    content: "An online store generates 2,00,000 monthly unique visitors. Current performance funnel:\n- Product Detail Page (PDP) Views: 1,20,000\n- Add to Cart: 18,000 (15%)\n- Initiate Checkout: 7,200 (40% of cart additions)\n- Completed Orders: 1,800 (25% of checkouts = overall 0.9% conversion rate)\n- Industry benchmark is 2.4% conversion rate with 65% cart recovery.\n\n### Key Case Study Objectives:\n1. Checkout Friction Analysis: Analyze root causes of 75% drop-off at checkout.\n2. 4 High-Impact A/B Test Hypotheses: Propose 4 rigorous A/B test experiments (one-page checkout, trust badges, shipping transparency, express UPI payments).\n3. Multi-Channel Cart Recovery Automation: Design a retention sequence (WhatsApp + Email + SMS) with timing triggers, copy hooks, and incentive thresholds.\n4. Financial Impact Projection: Calculate incremental monthly revenue if conversion rate increases from 0.9% to 2.1% (Assume Average Order Value = ₹2,500).",
     starterCode: {
-      python: "def allocate_funnel_budget(total_budget, campaign_goal):\n    # Return {'tofu_budget': float, 'mofu_budget': float, 'bofu_budget': float, 'primary_kpi': str}\n    pass\n",
+      text: "### 1. Checkout Friction Analysis & Root Causes:\n[Analyze hidden shipping costs, mandatory registration barriers, payment trust, and mobile UX friction]\n\n### 2. High-Impact A/B Testing Matrix:\n- Experiment 1 (Friction Reduction): Single-page guest checkout vs multi-step form\n- Experiment 2 (Trust & Urgency): Verified security badges, COD confirmation, customer reviews\n- Experiment 3 (Pricing Transparency): Free shipping progress bar vs surprise threshold at final step\n- Experiment 4 (Payment UX): 1-click UPI (GPay/PhonePe) buttons directly on Product Pages\n\n### 3. Multi-Channel Cart Recovery Automation Sequence:\n- 15 Minutes (WhatsApp): Gentle reminder with cart photo & 1-click resume link\n- 4 Hours (Email): Social proof, product warranty details, FAQ resolution\n- 24 Hours (Email + SMS): Limited-time 10% coupon code with 6-hour expiration timer\n\n### 4. Financial & ROI Projections (AOV = ₹2,500):\n- Current Monthly Revenue (1,800 orders @ ₹2,500): ₹45,00,000\n- Projected Orders @ 2.1% Conversion Rate (2,00,000 * 2.1%): 4,200 orders\n- Projected Monthly Revenue (4,200 orders @ ₹2,500): ₹1,05,00,000\n- Net Incremental Revenue Generated: ₹60,00,000 per month\n",
     },
-    testCases: [
-      {
-        input: "total_budget=100000, campaign_goal='DIRECT_PURCHASE'",
-        output: "{'tofu_budget': 20000.0, 'mofu_budget': 30000.0, 'bofu_budget': 50000.0, 'primary_kpi': 'ROAS & Cost Per Acquisition (CPA)'}",
-        isHidden: false,
-      },
-      {
-        input: "total_budget=500000, campaign_goal='BRAND_AWARENESS'",
-        output: "{'tofu_budget': 300000.0, 'mofu_budget': 150000.0, 'bofu_budget': 50000.0, 'primary_kpi': 'Impressions & Reach'}",
-        isHidden: false,
-      },
-    ],
+    testCases: null,
     points: 10,
   },
   {
     round: "ROUND_2_CODING",
     category: "DIGITAL_MARKETING",
     targetRole: "Digital Marketing",
-    title: "Retention Marketing: RFM Customer Segmentation Engine",
-    content: "Email marketers segment customers using RFM analysis (Recency, Frequency, Monetary) to send personalized automated flows.\n\nWrite a Python function `segment_customers(customers)` where `customers` is a list of dicts:\n`[{'id': 'c1', 'recency_days': 15, 'order_count': 6, 'total_spent': 12000}, ...]`\n\nClassification rules:\n1. `'CHAMPIONS'`: `recency_days <= 30` AND `order_count >= 5` AND `total_spent >= 10000`\n2. `'AT_RISK'`: `recency_days > 60` AND `order_count >= 3`\n3. `'NEW_CUSTOMERS'`: `recency_days <= 30` AND `order_count == 1`\n4. `'REGULAR'`: All other customers\n\nReturn a dictionary grouping customer IDs into lists: `{'CHAMPIONS': [...], 'AT_RISK': [...], 'NEW_CUSTOMERS': [...], 'REGULAR': [...]}`.",
+    title: "Lifecycle Marketing: RFM Customer Segmentation & Retention Engine",
+    content: "A consumer subscription brand has 50,000 registered customers. However, 68% of new buyers only place a single order and never return (Churn rate = 68%). Customer Acquisition Cost (CAC) is ₹800, while the average first-order margin is only ₹600, meaning the company loses money on first orders unless customers repurchase within 90 days.\n\n### Key Case Study Objectives:\n1. RFM Segmentation Strategy: Define thresholds for Recency (R), Frequency (F), and Monetary (M) to categorize users into: Champions, Loyalists, At Risk, and Hibernating.\n2. 3 Automated Lifecycle Journeys: Design automated flows for Onboarding/Second order conversion, VIP loyalty flow, and 60-day Inactive win-back.\n3. Channel Orchestration & Frequency Capping: Detail rules for Email, SMS, and WhatsApp to maximize engagement without spamming.\n4. Retention Economics & Target KPIs: Define targets for 90-day LTV, Repeat Purchase Rate (RPR), and CAC payback period.",
     starterCode: {
-      python: "def segment_customers(customers):\n    # Return dict with CHAMPIONS, AT_RISK, NEW_CUSTOMERS, REGULAR lists\n    pass\n",
+      text: "### 1. RFM Customer Segmentation Matrix:\n- Champions (R <= 30 days, F >= 4 orders, M >= ₹5,000): VIP early access, exclusive merchandise\n- Loyalists (R <= 45 days, F >= 2 orders, M >= ₹2,500): Upsell, cross-sell, loyalty points\n- At-Risk Customers (R 60-90 days, F >= 2 orders, low recent engagement): Personalized incentives\n- Hibernating / Lost (R > 90 days, F = 1 order): Heavy discount win-back or sunset list clean\n\n### 2. Three Core Automated Lifecycle Journeys:\n- Journey 1: Welcome & Second Order Conversion (Days 1 to 21)\n  * Day 1: Order confirmation + Product usage guide video\n  * Day 5: Delivery follow-up + How to get the best results\n  * Day 14: Cross-category recommendation + ₹200 bounce-back voucher\n- Journey 2: VIP Loyalty & Advocacy Flow (Champions)\n  * Surprise unannounced gift on 5th order, referral link with double points\n- Journey 3: Inactive Win-Back Flow (Days 60 to 75)\n  * We miss you subject line, customer feedback survey, aggressive reactivation offer\n\n### 3. Channel Orchestration & Frequency Capping:\n- Maximum 2 marketing emails per week, 1 WhatsApp per month, 1 transactional SMS per order\n- Channel preference mapping based on historical click behavior\n\n### 4. Retention Economics & Target KPIs:\n- Target Repeat Purchase Rate (RPR): Increase from 32% to 50%+\n- 90-Day Customer Lifetime Value (LTV): Increase from ₹900 to ₹2,200\n- Payback Period: Reduce from 120 days to 35 days (CAC recovered on order 2)\n",
     },
-    testCases: [
-      {
-        input: "customers=[{'id': 'c1', 'recency_days': 10, 'order_count': 6, 'total_spent': 15000}, {'id': 'c2', 'recency_days': 75, 'order_count': 4, 'total_spent': 5000}, {'id': 'c3', 'recency_days': 12, 'order_count': 1, 'total_spent': 1200}]",
-        output: "{'CHAMPIONS': ['c1'], 'AT_RISK': ['c2'], 'NEW_CUSTOMERS': ['c3'], 'REGULAR': []}",
-        isHidden: false,
-      },
-    ],
+    testCases: null,
     points: 10,
   },
   {
     round: "ROUND_2_CODING",
     category: "DIGITAL_MARKETING",
     targetRole: "Digital Marketing",
-    title: "Web Analytics: Multi-Touch Attribution Conversion Crediting",
-    content: "In Google Analytics 4 (GA4), touchpoints along a user journey receive credit for driving a conversion purchase.\n\nWrite a Python function `calculate_attribution(journey, total_revenue, model)` that takes:\n- `journey`: List of channel strings `['Google Ads', 'Organic Search', 'Meta Ads', 'Direct']`\n- `total_revenue`: Float total conversion value (e.g. `10000.0`)\n- `model`: One of `'FIRST_TOUCH'`, `'LAST_TOUCH'`, or `'LINEAR'`\n\nAttribution rules:\n- `'FIRST_TOUCH'`: The first channel gets 100% of revenue; all others get 0.0.\n- `'LAST_TOUCH'`: The last channel gets 100% of revenue; all others get 0.0.\n- `'LINEAR'`: Revenue is split equally across all touchpoints $(\\text{total_revenue} / N)$. If a channel appears multiple times, its shares are summed.\n\nReturn a dictionary mapping unique channel names to their credited revenue (rounded to 2 decimal places).",
+    title: "Web Analytics, Attribution Modeling & GA4 Measurement Plan",
+    content: "During an executive marketing review, leadership points out a major data discrepancy:\n- Meta Ads Manager reports 750 purchases\n- Google Ads reports 620 purchases\n- Klaviyo Email Marketing reports 310 purchases\n- However, Shopify / Backend Database shows only 1,100 total completed purchases! Combined platform claims exceed reality by 52.7% due to cross-channel attribution overlap.\n\n### Key Case Study Objectives:\n1. Attribution Discrepancy Diagnosis: Explain why self-attributing ad platforms over-claim conversions (view-through windows, deduplication failures).\n2. GA4 Attribution Model Comparison: Compare Last Non-Direct Click vs Data-Driven Attribution (DDA) and justify recommendation for budgeting.\n3. Tracking Architecture & Modern Stack: Detail Server-Side Google Tag Manager (sGTM) and Meta Conversions API (CAPI) to bypass ad blockers and iOS 14.5+ ATT privacy limits.\n4. Executive KPI Dashboard & Blended Economics: Define Marketing Efficiency Ratio (MER / Blended ROAS) and how to evaluate incrementality.",
     starterCode: {
-      python: "def calculate_attribution(journey, total_revenue, model):\n    # Return dict mapping channel -> credited revenue float\n    pass\n",
+      text: "### 1. Root Cause Diagnosis of Attribution Over-Reporting:\n- Self-Attributing Networks (SANs) claiming credit for any user who saw an ad within 1-day or 7-day window\n- Cross-device journeys and multi-touch overlap (e.g. Meta ad discovery -> Google search -> Email discount checkout)\n- Lack of unique transaction ID deduplication across ad tags\n\n### 2. GA4 Attribution Model Comparison & Recommendation:\n- Last Non-Direct Click: Ignores top-of-funnel discovery channels, over-weights brand search and email\n- Data-Driven Attribution (DDA): Uses machine learning algorithms to distribute fractional credit across all touchpoints\n- Strategic Recommendation: Use GA4 Data-Driven Attribution for channel credit, but rely on MER for macro-budget decisions\n\n### 3. Tracking Architecture & Modern Measurement Stack:\n- Client-side limitations (Ad blockers, Safari ITP 7-day cookie limits, iOS 14.5 ATT)\n- Server-Side GTM (sGTM) setup on first-party subdomain (e.g. data.company.com)\n- Meta Conversions API (CAPI) direct server-to-server webhook with Event Match Quality (EMQ) score > 8.0\n- Google Consent Mode v2 implementation for compliant modeling\n\n### 4. Executive KPI Dashboard & Blended Economics:\n- Marketing Efficiency Ratio (MER): Total Top-line Revenue / Total Marketing Spend across all channels\n- Blended CAC: Total Spend / Total Blended New Customers\n- Incrementality Testing: Geo-lift testing and holdout groups to verify true incremental revenue from paid ads\n",
     },
-    testCases: [
-      {
-        input: "journey=['Google Ads', 'Organic Search', 'Meta Ads'], total_revenue=6000.0, model='LINEAR'",
-        output: "{'Google Ads': 2000.0, 'Organic Search': 2000.0, 'Meta Ads': 2000.0}",
-        isHidden: false,
-      },
-      {
-        input: "journey=['Meta Ads', 'Email', 'Direct'], total_revenue=5000.0, model='FIRST_TOUCH'",
-        output: "{'Meta Ads': 5000.0, 'Email': 0.0, 'Direct': 0.0}",
-        isHidden: false,
-      },
-    ],
+    testCases: null,
     points: 10,
   },
 ];

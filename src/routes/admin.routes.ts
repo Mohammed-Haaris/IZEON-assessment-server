@@ -133,6 +133,38 @@ router.patch("/students/:id/camera-exemption", async (req: AuthRequest, res: Res
   }
 });
 
+// 2b. Toggle camera exemption for a student
+router.patch("/students/:id/camera-exemption", async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { allowWithoutCamera } = req.body;
+
+    if (typeof allowWithoutCamera !== "boolean") {
+      res.status(400).json({ message: "allowWithoutCamera must be a boolean" });
+      return;
+    }
+
+    const updatedStudent = await prisma.user.update({
+      where: { id },
+      data: { allowWithoutCamera },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        allowWithoutCamera: true,
+      },
+    });
+
+    res.json({
+      message: `Camera exemption ${allowWithoutCamera ? "granted" : "revoked"} for ${updatedStudent.name}`,
+      student: updatedStudent,
+    });
+  } catch (error: any) {
+    console.error("Camera exemption error:", error);
+    res.status(500).json({ message: "Failed to update camera exemption", error: error.message });
+  }
+});
+
 // 3. Get all assessments
 router.get("/assessments", async (req: AuthRequest, res: Response) => {
   try {
@@ -1162,17 +1194,17 @@ router.post("/colleges", async (req: AuthRequest, res: Response) => {
 // 17.3 Update a college
 router.put("/colleges/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { name, code, isActive } = req.body;
 
-    const existing = await prisma.college.findUnique({ where: { id: id as string } });
+    const existing = await prisma.college.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ message: "College not found" });
       return;
     }
 
     const updated = await prisma.college.update({
-      where: { id: id as string },
+      where: { id },
       data: {
         ...(name !== undefined && typeof name === "string" ? { name: name.trim() } : {}),
         ...(code !== undefined ? { code: code && typeof code === "string" ? code.trim().toUpperCase() : null } : {}),
@@ -1190,8 +1222,8 @@ router.put("/colleges/:id", async (req: AuthRequest, res: Response) => {
 // 17.4 Delete a college
 router.delete("/colleges/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    await prisma.college.delete({ where: { id: id as string } });
+    const id = req.params.id as string;
+    await prisma.college.delete({ where: { id } });
     res.json({ message: "College deleted successfully" });
   } catch (error: any) {
     console.error("Delete college error:", error);

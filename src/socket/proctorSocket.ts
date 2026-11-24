@@ -27,6 +27,60 @@ export function setupProctorSocket(io: SocketIOServer) {
       socket.join("admin_monitor");
     });
 
+    // Student joins personal room for real-time proctor updates & camera exemptions
+    socket.on("join:student", (studentId: string) => {
+      if (studentId && typeof studentId === "string") {
+        socket.join(`student:${studentId}`);
+      }
+    });
+
+    // Student requests camera exemption when camera cannot turn on in browser
+    socket.on("student:camera_help_request", (data: {
+      studentId: string;
+      studentName: string;
+      studentEmail: string;
+      college?: string;
+      reason?: string;
+    }) => {
+      if (!data || !data.studentId) return;
+      io.to("admin_monitor").emit("admin:camera_help_request", {
+        studentId: data.studentId,
+        studentName: data.studentName,
+        studentEmail: data.studentEmail,
+        college: data.college || "Not Specified",
+        reason: data.reason || "Webcam failed or permission blocked in browser",
+        timestamp: new Date(),
+      });
+    });
+
+    // Admin grants camera exemption directly via socket in 1 click
+    socket.on("admin:grant_camera_exemption", async (data: { studentId: string; allowWithoutCamera: boolean }) => {
+      try {
+        const { studentId, allowWithoutCamera = true } = data;
+        if (!studentId) return;
+
+        const updatedStudent = await prisma.user.update({
+          where: { id: studentId },
+          data: { allowWithoutCamera },
+          select: { id: true, name: true, allowWithoutCamera: true },
+        });
+
+        // Notify student room immediately to unlock exam screen instantly
+        io.to(`student:${studentId}`).emit("student:camera_exemption_granted", {
+          studentId: updatedStudent.id,
+          allowWithoutCamera: updatedStudent.allowWithoutCamera,
+        });
+
+        // Broadcast confirmation to all admin monitors
+        io.to("admin_monitor").emit("admin:camera_exemption_confirmed", {
+          studentId: updatedStudent.id,
+          allowWithoutCamera: updatedStudent.allowWithoutCamera,
+        });
+      } catch (err) {
+        console.error("Error granting camera exemption via socket:", err);
+      }
+    });
+
     // 2. Student tab switch violation reported
     socket.on(
       "student:tab_switch",

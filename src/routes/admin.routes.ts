@@ -123,37 +123,18 @@ router.patch("/students/:id/camera-exemption", async (req: AuthRequest, res: Res
       },
     });
 
-    res.json({
-      message: `Camera exemption ${allowWithoutCamera ? "granted" : "revoked"} for ${updatedStudent.name}`,
-      student: updatedStudent,
-    });
-  } catch (error: any) {
-    console.error("Camera exemption error:", error);
-    res.status(500).json({ message: "Failed to update camera exemption", error: error.message });
-  }
-});
-
-// 2b. Toggle camera exemption for a student
-router.patch("/students/:id/camera-exemption", async (req: AuthRequest, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { allowWithoutCamera } = req.body;
-
-    if (typeof allowWithoutCamera !== "boolean") {
-      res.status(400).json({ message: "allowWithoutCamera must be a boolean" });
-      return;
+    // Notify student live through Socket.IO so exam unlocks in real time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`student:${id}`).emit("student:camera_exemption_granted", {
+        studentId: id,
+        allowWithoutCamera,
+      });
+      io.to("admin_monitor").emit("admin:camera_exemption_confirmed", {
+        studentId: id,
+        allowWithoutCamera,
+      });
     }
-
-    const updatedStudent = await prisma.user.update({
-      where: { id },
-      data: { allowWithoutCamera },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        allowWithoutCamera: true,
-      },
-    });
 
     res.json({
       message: `Camera exemption ${allowWithoutCamera ? "granted" : "revoked"} for ${updatedStudent.name}`,

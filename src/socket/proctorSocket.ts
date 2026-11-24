@@ -109,22 +109,23 @@ export function setupProctorSocket(io: SocketIOServer) {
           if (!attempt) return;
           if (attempt.status === "COMPLETED" || attempt.status === "DISQUALIFIED" || attempt.status === "MALPRACTICE_LOCKED") return;
 
-          const newCount = attempt.tabSwitchCount + 1;
-
-          // Deduplicate strikes: prevent duplicate log if this strike was already recorded
-          const existingStrikeLog = await prisma.malpracticeLog.findFirst({
-            where: {
-              attemptId: attempt.id,
-              violationCount: newCount,
-            },
-          });
+          // Deduplicate: prevent duplicate log if another tab switch happened in last 2 seconds
           const recentLog = await prisma.malpracticeLog.findFirst({
             where: {
               attemptId: attempt.id,
-              timestamp: { gte: new Date(Date.now() - 2500) },
+              timestamp: { gte: new Date(Date.now() - 2000) },
             },
           });
-          if (existingStrikeLog || recentLog) return;
+          // Also prevent creating multiple pending logs if candidate is already pending review
+          const pendingLog = await prisma.malpracticeLog.findFirst({
+            where: {
+              attemptId: attempt.id,
+              adminDecision: "PENDING",
+            },
+          });
+          if (recentLog || pendingLog) return;
+
+          const newCount = attempt.tabSwitchCount >= 1 ? 2 : 1;
 
           // Record malpractice incident log
           const log = await prisma.malpracticeLog.create({

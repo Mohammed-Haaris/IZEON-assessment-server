@@ -94,17 +94,21 @@ export async function seedDefaultData() {
           durationR2: 45, // 45 mins
           passingScore: 40,
           cutoffRound1: 12,
+          cutoffRound2: 30,
           isActive: true,
         },
       });
     } else {
-      // Update assessment cutoffRound1 to 12 if not already 12
-      await prisma.assessment.update({
-        where: { id: activeAssessment.id },
-        data: {
-          cutoffRound1: 12,
-        },
-      });
+      // Update assessment cutoffRound1 and cutoffRound2 if needed
+      if ((activeAssessment as any).cutoffRound1 !== 12 || (activeAssessment as any).cutoffRound2 === undefined || (activeAssessment as any).cutoffRound2 === null) {
+        await prisma.assessment.update({
+          where: { id: activeAssessment.id },
+          data: {
+            cutoffRound1: 12,
+            cutoffRound2: (activeAssessment as any).cutoffRound2 ?? 30,
+          },
+        });
+      }
     }
 
     // 2.1 Deduplicate any questions that may have duplicate titles in activeAssessment

@@ -177,6 +177,7 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
       durationR2 = 45,
       passingScore = 60,
       cutoffRound1 = 12,
+      cutoffRound2 = 30,
       isActive = true,
     } = req.body;
 
@@ -193,6 +194,7 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
         durationR2: Number(durationR2),
         passingScore: Number(passingScore),
         cutoffRound1: Number(cutoffRound1),
+        cutoffRound2: Number(cutoffRound2),
         isActive: Boolean(isActive),
       },
     });
@@ -209,13 +211,14 @@ router.post("/assessments", async (req: AuthRequest, res: Response) => {
 router.patch("/assessments/:id", async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { title, description, durationR1, durationR2, passingScore, cutoffRound1, isActive } = req.body;
+    const { title, description, durationR1, durationR2, passingScore, cutoffRound1, cutoffRound2, isActive } = req.body;
 
     const data: any = {};
     if (durationR1 !== undefined) data.durationR1 = Math.max(1, parseInt(durationR1, 10));
     if (durationR2 !== undefined) data.durationR2 = Math.max(1, parseInt(durationR2, 10));
     if (passingScore !== undefined) data.passingScore = Math.max(0, parseInt(passingScore, 10));
     if (cutoffRound1 !== undefined) data.cutoffRound1 = Math.max(0, parseInt(cutoffRound1, 10));
+    if (cutoffRound2 !== undefined) data.cutoffRound2 = Math.max(0, parseInt(cutoffRound2, 10));
     if (title !== undefined && title.trim()) data.title = title.trim();
     if (description !== undefined) data.description = description;
     if (isActive !== undefined) data.isActive = Boolean(isActive);
@@ -413,10 +416,13 @@ router.post("/assessments/:id/standardize-marks", async (req: AuthRequest, res: 
       return;
     }
 
-    // 1. Update assessment cutoffRound1 to 12
+    // 1. Update assessment cutoffs (Round 1: 12, Round 2: 30)
     await prisma.assessment.update({
       where: { id },
-      data: { cutoffRound1: 12 },
+      data: {
+        cutoffRound1: 12,
+        cutoffRound2: (assessment as any).cutoffRound2 ?? 30,
+      },
     });
 
     // 2. Set all Round 1 questions in this assessment to 1 pt
@@ -584,7 +590,7 @@ router.get("/attempts", async (req: AuthRequest, res: Response) => {
           },
         },
         assessment: {
-          select: { id: true, title: true, durationR1: true, durationR2: true, passingScore: true },
+          select: { id: true, title: true, durationR1: true, durationR2: true, passingScore: true, cutoffRound1: true, cutoffRound2: true },
         },
         malpracticeLogs: {
           take: 20,
@@ -633,17 +639,20 @@ router.get("/malpractice-logs", async (req: AuthRequest, res: Response) => {
       orderBy: { timestamp: "desc" },
     });
 
-    // Deduplicate any historical duplicate rows
-    const seen = new Set<string>();
+    // Deduplicate only true duplicate rows created within 3 seconds of each other
     const duplicateIdsToDelete: string[] = [];
     const uniqueLogs: typeof rawLogs = [];
 
     for (const log of rawLogs) {
-      const key = `${log.attemptId}_${log.violationCount}`;
-      if (seen.has(key)) {
+      const isDuplicate = uniqueLogs.some(
+        (u) =>
+          u.attemptId === log.attemptId &&
+          u.violationCount === log.violationCount &&
+          Math.abs(new Date(u.timestamp).getTime() - new Date(log.timestamp).getTime()) < 3000
+      );
+      if (isDuplicate) {
         duplicateIdsToDelete.push(log.id);
       } else {
-        seen.add(key);
         uniqueLogs.push(log);
       }
     }

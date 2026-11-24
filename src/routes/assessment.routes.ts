@@ -250,24 +250,24 @@ router.post("/report-malpractice", async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const newCount = attempt.tabSwitchCount + 1;
+    const newCount = attempt.tabSwitchCount >= 1 ? 2 : 1;
     const isLocked = newCount >= 2;
 
-    // Deduplicate strikes: prevent duplicate log if this strike was already recorded
-    const existingStrikeLog = await prisma.malpracticeLog.findFirst({
-      where: {
-        attemptId: attempt.id,
-        violationCount: newCount,
-      },
-    });
+    // Deduplicate strikes: prevent duplicate log if another tab switch was registered in the last 2.5s or pending
     const recentLog = await prisma.malpracticeLog.findFirst({
       where: {
         attemptId: attempt.id,
         timestamp: { gte: new Date(Date.now() - 2500) },
       },
     });
+    const pendingLog = await prisma.malpracticeLog.findFirst({
+      where: {
+        attemptId: attempt.id,
+        adminDecision: "PENDING",
+      },
+    });
 
-    if (existingStrikeLog || recentLog) {
+    if (recentLog || pendingLog) {
       res.json({
         success: true,
         message: "Duplicate violation ignored",
@@ -547,9 +547,14 @@ router.post("/submit-round2", async (req: AuthRequest, res: Response) => {
       },
     });
 
+    const cutoffRound2 = (attempt.assessment as any).cutoffRound2 ?? 30;
+    const isRound2Qualified = round2Score >= cutoffRound2;
+
     res.json({
       message: "Assessment completed and submitted successfully!",
       attempt: updatedAttempt,
+      cutoffRound2,
+      isRound2Qualified,
     });
   } catch (error: any) {
     console.error("Submit round 2 error:", error);
